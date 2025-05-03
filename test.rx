@@ -1,1 +1,10 @@
-log("koniec komenatrza nie jest wymagany!")
+already_ate = 1
+if (already_ate == 1) {
+    log('Jeszcze nie jadłeś!')
+}
+if (already_ate == 0) {
+    log('Już jadłeś!')
+}
+
+|| Początek komenatarza. Koniec Komenatrza || log('This is a open source sample code...')
+batch('pause')
