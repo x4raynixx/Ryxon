@@ -439,15 +439,7 @@ public class RXInterpreter
                         }
                         currentChainEndLineIndex = elseIfBlockInfo.EndLineIndex;
                     }
-                    else if (nextLineTrimmed.StartsWith("else"))
-                    {
-                        int nextOpenBrace = nextLineOriginal.IndexOf('{');
-                        string elsePart = nextLinePreprocessed.Substring(0, nextOpenBrace < 0 ? nextLinePreprocessed.Length : nextOpenBrace).Trim();
-                        if (nextOpenBrace == -1 || elsePart != "else")
-                        {
-                             PrintError("Invalid else statement syntax 'else {'", nextLineIndex + 1, filename);
-                             break;
-                        }
+                    
                         
                         BlockInfo elseBlockInfo = ExtractBlockOriginalLogic(lines, nextLineIndex, nextOpenBrace, filename);
                         if (!elseBlockInfo.Found)
