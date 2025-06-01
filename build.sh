@@ -3,7 +3,7 @@
 set -e
 
 echo "Building..."
-mkdir -p build bin
+mkdir -p temp bin
 
 case "$(uname -s)" in
     Linux*)     PLATFORM=linux;;
@@ -18,8 +18,8 @@ COMMON_FLAGS="-std=c++17 -Wall -Wextra -O2 -I./src"
 case $PLATFORM in
     linux)
         echo "Building for Linux..."
-        g++ $COMMON_FLAGS src/*.cpp -o bin/rx.deb
-        echo "Built: bin/rx.deb"
+        g++ $COMMON_FLAGS src/*.cpp -o bin/rx.lnx
+        echo "Built: bin/rx.lnx"
         ;;
     macos)
         echo "Building for macOS..."
@@ -52,28 +52,28 @@ if [ "$1" = "all" ]; then
 fi
 
 echo "Testing the build..."
-echo 'print("Hello from RX!")' > test.rx
+echo 'print("Hello from RX!")' > temp/test.rx
 
 case $PLATFORM in
     linux)
         if [ -f "bin/rx_linux" ]; then
             echo "Running test..."
-            ./bin/rx_linux test.rx
+            ./bin/rx_linux temp/test.rx
         fi
         ;;
     macos)
         if [ -f "bin/rx_macos" ]; then
             echo "Running test..."
-            ./bin/rx_macos test.rx
+            ./bin/rx_macos temp/test.rx
         fi
         ;;
     *)
         if [ -f "bin/rx" ]; then
             echo "Running test..."
-            ./bin/rx test.rx
+            ./bin/rx temp/test.rx
         fi
         ;;
 esac
 
-rm -f test.rx
+rm -rf temp
 echo "Build finished successfully"
