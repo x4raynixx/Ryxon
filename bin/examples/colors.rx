@@ -1,0 +1,30 @@
+^colors
+
+print("=== color demo ===")
+
+print(c@red"this text is red!")
+print(c@green"this text is green!")
+print(c@blue"this text is blue!")
+print(c@yellow"this text is yellow!")
+
+print(c@magenta"magenta text here")
+print(c@cyan"cyan colored text")
+print(c@white"white text")
+
+print("normal text and", c@red"red text", "together")
+
+i = 0
+while (i < 4) {
+    if (i == 0) {
+        print(c@red"color number", i)
+    } diff if (i == 1) {
+        print(c@green"color number", i)
+    } diff if (i == 2) {
+        print(c@blue"color number", i)
+    } diff {
+        print(c@yellow"color number", i)
+    }
+    i = i + 1
+}
+
+print("back to normal text")
