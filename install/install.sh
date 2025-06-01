@@ -31,7 +31,12 @@ if [[ "$PREFIX" == *"com.termux"* ]]; then
     mv rx ~/.local/bin/rx
     chmod +x ~/.local/bin/rx
     echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.bashrc
-    echo 'Installation complete! Restart Termux or run: source ~/.bashrc'
+    echo 'Installation complete!'
+    if [ -f "$HOME/.bashrc" ]; then
+        source "$HOME/.bashrc"
+    elif [ -f "$HOME/.zshrc" ]; then
+        source "$HOME/.zshrc"
+    fi
     cd .. && rm -rf rx_temp
     exit 0
 fi
