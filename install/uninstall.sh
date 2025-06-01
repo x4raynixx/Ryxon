@@ -13,28 +13,23 @@ else
 fi
 
 if [ -f "$INSTALL_PATH" ]; then
-    rm -f "$INSTALL_PATH"
-fi
-
-if $IS_TERMUX; then
-    if [ -f "$HOME/.bashrc" ]; then
-        sed -i '/\.local\/bin/d' "$HOME/.bashrc"
+    if $IS_TERMUX; then
+        rm -f "$INSTALL_PATH"
+        sed -i '/export PATH="\$HOME\/.local\/bin:\$PATH"/d' "$HOME/.bashrc" 2>/dev/null || true
+        sed -i '/export PATH="\$HOME\/.local\/bin:\$PATH"/d' "$HOME/.zshrc" 2>/dev/null || true
+    else
+        sudo rm -f "$INSTALL_PATH"
+        if [[ "$OSTYPE" == "darwin"* ]]; then
+            sed -i '' '/\/usr\/local\/bin\/rx/d' "$HOME/.bash_profile" 2>/dev/null || true
+            sed -i '' '/\/usr\/local\/bin\/rx/d' "$HOME/.zshrc" 2>/dev/null || true
+        else
+            sed -i '/\/usr\/local\/bin\/rx/d' "$HOME/.bashrc" 2>/dev/null || true
+            sed -i '/\/usr\/local\/bin\/rx/d' "$HOME/.zshrc" 2>/dev/null || true
+        fi
     fi
-    if [ -f "$HOME/.zshrc" ]; then
-        sed -i '/\.local\/bin/d' "$HOME/.zshrc"
-    fi
-elif [[ "$OSTYPE" == "darwin"* ]]; then
-    if [ -f "$HOME/.bash_profile" ]; then
-        sed -i '' '/\/usr\/local\/bin\/rx/d' "$HOME/.bash_profile"
-    fi
-    if [ -f "$HOME/.zshrc" ]; then
-        sed -i '' '/\/usr\/local\/bin\/rx/d' "$HOME/.zshrc"
-    fi
+    source "$HOME/.bashrc" 2>/dev/null || true
+    source "$HOME/.zshrc" 2>/dev/null || true
+    echo "rx uninstalled and PATH cleaned."
 else
-    if [ -f "$HOME/.bashrc" ]; then
-        sed -i '/\/usr\/local\/bin\/rx/d' "$HOME/.bashrc"
-    fi
-    if [ -f "$HOME/.zshrc" ]; then
-        sed -i '/\/usr\/local\/bin\/rx/d' "$HOME/.zshrc"
-    fi
+    echo "rx not found at $INSTALL_PATH, nothing to uninstall."
 fi
