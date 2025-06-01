@@ -1,42 +1,69 @@
-#!/bin/bash set -e
+#!/bin/bash
 
-OS="" ARCH=""
+set -e
 
-uname_os=$(uname -s) uname_arch=$(uname -m)
+OS=""
+ARCH=""
 
-case "$uname_os" in Linux) OS="linux" ;; Darwin) OS="macos" ;; CYGWIN*|MINGW*|MSYS*) OS="windows" ;; *) echo "Unsupported OS: $uname_os"; exit 1 ;; esac
+uname_os=$(uname -s)
+uname_arch=$(uname -m)
 
-case "$uname_arch" in x86_64|amd64) ARCH="x86_64" ;; aarch64|arm64) ARCH="arm64" ;; i686|i386) ARCH="x86" ;; *) echo "Unsupported architecture: $uname_arch"; exit 1 ;; esac
+case "$uname_os" in
+    Linux) OS="linux" ;;
+    Darwin) OS="macos" ;;
+    *) echo "Unsupported OS: $uname_os"; exit 1 ;;
+esac
 
-if [ -n "$PREFIX" ] && [[ "$PREFIX" == "/data/data/" ]]; then ENV_TERMUX=true else ENV_TERMUX=false fi
+case "$uname_arch" in
+    x86_64|amd64) ARCH="x86_64" ;;
+    aarch64|arm64) ARCH="arm64" ;;
+    *) echo "Unsupported architecture: $uname_arch"; exit 1 ;;
+esac
 
-BASE_URL="https://raw.githubusercontent.com/x4raynixx/RX-Scripting/master/install"
-
-if $ENV_TERMUX; then echo "Detecting environment..." echo "Termux environment detected. Architecture: $ARCH"
-
-pkg update -y && pkg install -y git clang build-essential
-git clone https://github.com/x4raynixx/RX-Scripting
-cd RX-Scripting/src
-clang++ -std=c++17 -O2 *.cpp -o rx
-mkdir -p $HOME/.local/bin
-mv rx $HOME/.local/bin/rx
-chmod +x $HOME/.local/bin/rx
-echo "export PATH=\"$HOME/.local/bin:\$PATH\"" >> $HOME/.bashrc
-echo "Added ~/.local/bin to PATH."
-echo "Installation complete! Restart Termux or run: source ~/.bashrc or source ~/.zshrc"
-exit 0
-
+if [[ "$PREFIX" == *"com.termux"* ]]; then
+    echo "Detected Termux environment. Architecture: $ARCH"
+    pkg update -y
+    pkg install -y git curl clang make build-essential
+    rm -rf rx_temp && mkdir rx_temp && cd rx_temp
+    curl -fsSL https://api.github.com/repos/x4raynixx/RX-Scripting/contents/src | grep 'download_url' | cut -d '"' -f4 | while read url; do curl -fsSL "$url" -O; done
+    clang++ -std=c++17 -Wall -Wextra -O2 *.cpp -o rx
+    mkdir -p ~/.local/bin
+    mv rx ~/.local/bin/rx
+    chmod +x ~/.local/bin/rx
+    echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.bashrc
+    echo 'Installation complete! Restart Termux or run: source ~/.bashrc'
+    cd .. && rm -rf rx_temp
+    exit 0
 fi
 
-if [[ "$OS" == "windows" ]]; then FILE_NAME="rx.exe" else FILE_NAME="rx_${OS}_${ARCH}" fi
+FILE_NAME="rx_${OS}_${ARCH}"
+URL="https://raw.githubusercontent.com/x4raynixx/RX-Scripting/master/install/${FILE_NAME}"
+TMPFILE=$(mktemp)
 
-DOWNLOAD_URL="$BASE_URL/$FILE_NAME" TMPFILE=$(mktemp)
+if ! curl -fsSL "$URL" -o "$TMPFILE"; then
+    if [[ "$OS" != "linux" ]]; then rm -f "$TMPFILE"; exit 1; fi
+    if [[ "$ARCH" == "arm64" ]] && grep -qi "raspberry" /proc/cpuinfo 2>/dev/null; then
+        sudo apt update && sudo apt upgrade -y
+        sudo apt install -y build-essential libc6 libstdc++6
+    fi
+    if ! command -v g++ &>/dev/null; then
+        sudo apt update && sudo apt install -y build-essential
+    fi
+    rm -rf rx_temp && mkdir rx_temp && cd rx_temp
+    curl -fsSL https://api.github.com/repos/x4raynixx/RX-Scripting/contents/src | grep 'download_url' | cut -d '"' -f4 | while read url; do curl -fsSL "$url" -O; done
+    g++ -std=c++17 -Wall -Wextra -O2 *.cpp -o rx_build
+    sudo mv rx_build /usr/local/bin/rx
+    sudo chmod +x /usr/local/bin/rx
+    cd .. && rm -rf rx_temp
+    rm -f "$TMPFILE"
+    exit 0
+fi
 
-echo "Detecting environment..." echo "Detected OS: $OS, Architecture: $ARCH" echo "Downloading $FILE_NAME from GitHub..."
+if [[ ! -s "$TMPFILE" ]]; then
+    rm -f "$TMPFILE"
+    exit 1
+fi
 
-if ! curl -fsSL "$DOWNLOAD_URL" -o "$TMPFILE"; then echo "Failed to download binary from $DOWNLOAD_URL" rm -f "$TMPFILE" exit 1 fi
-
-if [[ ! -s "$TMPFILE" ]]; then echo "Downloaded file is empty. Exiting." rm -f "$TMPFILE" exit 1 fi
-
-sudo mv "$TMPFILE" /usr/local/bin/rx sudo chmod +x /usr/local/bin/rx echo "Installation complete! You can now run 'rx' from anywhere."
-
+sudo mv "$TMPFILE" /usr/local/bin/rx
+sudo chmod +x /usr/local/bin/rx
+echo "Installation complete! You can now run 'rx' from anywhere."
