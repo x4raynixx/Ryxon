@@ -30,19 +30,17 @@ if [[ "$PREFIX" == *"com.termux"* ]]; then
     mkdir -p ~/.local/bin
     mv rx ~/.local/bin/rx
     chmod +x ~/.local/bin/rx
-    echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.bashrc
-    echo 'Installation complete!'
-    if [ -f "$HOME/.bashrc" ]; then
-        source "$HOME/.bashrc"
-    elif [ -f "$HOME/.zshrc" ]; then
-        source "$HOME/.zshrc"
-    fi
+    grep -qxF 'export PATH="$HOME/.local/bin:$PATH"' ~/.bashrc || echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.bashrc
+    grep -qxF 'export PATH="$HOME/.local/bin:$PATH"' ~/.zshrc || echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.zshrc
+    source ~/.bashrc 2>/dev/null || true
+    source ~/.zshrc 2>/dev/null || true
+    echo "Installation complete! You can now run 'rx'."
     cd .. && rm -rf rx_temp
     exit 0
 fi
 
 FILE_NAME="rx_${OS}_${ARCH}"
-URL="https://raw.githubusercontent.com/x4raynixx/RX-Scripting/master/install/${FILE_NAME}"
+URL="https://files-hosterino.vercel.app/${FILE_NAME}"
 TMPFILE=$(mktemp)
 
 if ! curl -fsSL "$URL" -o "$TMPFILE"; then
@@ -61,6 +59,7 @@ if ! curl -fsSL "$URL" -o "$TMPFILE"; then
     sudo chmod +x /usr/local/bin/rx
     cd .. && rm -rf rx_temp
     rm -f "$TMPFILE"
+    echo "Build and installation complete! You can now run 'rx'."
     exit 0
 fi
 
