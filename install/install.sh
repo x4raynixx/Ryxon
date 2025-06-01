@@ -71,3 +71,4 @@ fi
 sudo mv "$TMPFILE" /usr/local/bin/rx
 sudo chmod +x /usr/local/bin/rx
 echo "Installation complete! You can now run 'rx' from anywhere."
+echo "Restart terminal or run: source ~/.bashrc or source ~/.zshrc to apply changes"
