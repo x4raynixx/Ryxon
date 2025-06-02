@@ -53,7 +53,7 @@ if not exist "%installDir%" (
 
 color 0E
 echo Downloading %file%...
-curl -L -o "%installDir%\rx.exe" "https://github.com/x4raynixx/RX-Scripting/raw/master/install/%file%"
+curl -L -o "%installDir%\rx.exe" "https://github.com/x4raynixx/Ryxon/raw/master/install/%file%"
 if errorlevel 1 (
     color 0C
     echo Download failed!
