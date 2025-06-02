@@ -70,24 +70,24 @@ echo Added %installDir% to user PATH.
 echo Associating .rx extension and default application...
 assoc .rx=RXFile
 ftype RXFile="%installDir%\rx.exe" "%%1"
-reg add "HKCR\RXFile" /ve /d "RX Script" /f >nul
+reg add "HKCR\RXFile" /ve /d "Ryxon" /f >nul
 reg add "HKCR\RXFile\DefaultIcon" /ve /d "%installDir%\rx.exe,0" /f >nul
 
-echo Creating template for New > RX Script...
+echo Creating template for New > Ryxon...
 set "templateDir=%ProgramData%\Microsoft\Windows\Templates"
 if not exist "%templateDir%" mkdir "%templateDir%"
-type nul > "%templateDir%\RX Script.rx"
+type nul > "%templateDir%\Ryxon.rx"
 
-echo Adding RX Script to New menu...
+echo Adding Ryxon to New menu...
 reg add "HKCR\.rx" /ve /d "RXFile" /f >nul
-reg add "HKCR\.rx\ShellNew" /v FileName /d "RX Script.rx" /f >nul
+reg add "HKCR\.rx\ShellNew" /v FileName /d "Ryxon.rx" /f >nul
 
 cls
 color 0A
 echo ===============================
 echo RX was installed successfully.
 echo You can now use the 'rx' command or run .rx files directly.
-echo New > RX Script is now available.
+echo New > Ryxon is now available.
 echo ===============================
 color 7
 pause
