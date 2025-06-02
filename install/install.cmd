@@ -67,5 +67,5 @@ echo ===============================
 echo RX installed successfully.
 echo ===============================
 pause
-color 0
+color 7
 endlocal
