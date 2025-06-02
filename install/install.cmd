@@ -114,6 +114,7 @@ echo ===============================
 echo RX was installed successfully.
 echo Now, you can use 'rx' command or run .rx files directly.
 echo You can also create new RX Script files from New menu.
+echo RX Scripting Language :D
 echo ===============================
 pause
 endlocal
