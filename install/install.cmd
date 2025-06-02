@@ -75,14 +75,15 @@ reg add "HKCR\RXFile\shell\open\command" /ve /d "\"%installDir%\rx.exe\" \"%%1\"
 reg add "HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer\FileExts\.rx\UserChoice" /v Progid /d RXFile /f >nul
 
 echo Adding RX Script to New menu...
+reg add "HKCR\.rx\ShellNew" /ve /d "RX Script" /f >nul
 reg add "HKCR\.rx\ShellNew" /v NullFile /f >nul
-reg add "HKCR\.rx\ShellNew" /v MenuText /d "RX Script" /f >nul
 
 cls
 color 0A
 echo ===============================
 echo RX was installed successfully.
 echo You can now use the 'rx' command or run .rx files directly.
+echo New > RX Script is now available.
 echo ===============================
 pause
 endlocal
