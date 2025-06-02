@@ -62,37 +62,23 @@ if errorlevel 1 (
 )
 echo Download completed.
 
-echo Updating system PATH...
-for /f "tokens=2,*" %%A in ('reg query "HKLM\SYSTEM\CurrentControlSet\Control\Session Manager\Environment" /v Path ^| findstr /I "Path"') do set "machinePath=%%B"
-echo %machinePath% | findstr /i /c:"%installDir%" >nul
-if errorlevel 1 (
-    set "newMachinePath=%machinePath%;%installDir%"
-    reg add "HKLM\SYSTEM\CurrentControlSet\Control\Session Manager\Environment" /v Path /t REG_EXPAND_SZ /d "%newMachinePath%" /f >nul
-    echo Added %installDir% to system PATH.
-) else (
-    echo Path %installDir% already in system PATH.
-)
-
 echo Updating user PATH...
-for /f "tokens=2,*" %%A in ('reg query "HKCU\Environment" /v Path ^| findstr /I "Path"') do set "userPath=%%B"
-echo %userPath% | findstr /i /c:"%installDir%" >nul
-if errorlevel 1 (
-    set "newUserPath=%userPath%;%installDir%"
-    reg add "HKCU\Environment" /v Path /t REG_EXPAND_SZ /d "%newUserPath%" /f >nul
-    echo Added %installDir% to user PATH.
-) else (
-    echo Path %installDir% already in user PATH.
-)
+powershell -NoProfile -ExecutionPolicy Bypass -Command ^
+    "[Environment]::SetEnvironmentVariable('Path', (Get-ItemProperty -Path 'HKCU:\Environment' -Name Path).Path + ';%installDir%', 'User')" >nul 2>&1
+echo Added %installDir% to user PATH.
 
+echo Associating .rx extension and default application...
 assoc .rx=RXFile
 ftype RXFile="%installDir%\rx.exe" "%%1"
 reg add "HKCR\RXFile" /ve /d "RX Script" /f >nul
 reg add "HKCR\RXFile\DefaultIcon" /ve /d "%installDir%\rx.exe,0" /f >nul
 
+echo Creating template for New > RX Script...
 set "templateDir=%ProgramData%\Microsoft\Windows\Templates"
 if not exist "%templateDir%" mkdir "%templateDir%"
 type nul > "%templateDir%\RX Script.rx"
 
+echo Adding RX Script to New menu...
 reg add "HKCR\.rx" /ve /d "RXFile" /f >nul
 reg add "HKCR\.rx\ShellNew" /v FileName /d "RX Script.rx" /f >nul
 
@@ -103,6 +89,7 @@ echo RX was installed successfully.
 echo You can now use the 'rx' command or run .rx files directly.
 echo New > RX Script is now available.
 echo ===============================
+color 7
 pause
 endlocal
 exit /b
