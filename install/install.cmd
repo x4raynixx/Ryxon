@@ -70,16 +70,21 @@ for /f "usebackq tokens=2*" %%a in (`reg query "HKLM\SYSTEM\CurrentControlSet\Co
 )
 echo %machinePath% | find /i "%installDir%" >nul
 if errorlevel 1 (
-    reg add "HKLM\SYSTEM\CurrentControlSet\Control\Session Manager\Environment" /v Path /t REG_EXPAND_SZ /d "%machinePath%;%installDir%" /f >nul
+    set "newMachinePath=%machinePath%;%installDir%"
+    reg add "HKLM\SYSTEM\CurrentControlSet\Control\Session Manager\Environment" /v Path /t REG_EXPAND_SZ /d "%newMachinePath%" /f >nul
     echo Added %installDir% to system PATH (machine).
 ) else (
     echo Path %installDir% already in system PATH.
 )
 
-set "userPath=%PATH%"
+echo Updating user PATH...
+for /f "usebackq tokens=2*" %%a in (`reg query "HKCU\Environment" /v Path 2^>nul ^| findstr "Path"`) do (
+    set "userPath=%%b"
+)
 echo %userPath% | find /i "%installDir%" >nul
 if errorlevel 1 (
-    setx PATH "%userPath%;%installDir%" >nul
+    set "newUserPath=%userPath%;%installDir%"
+    reg add "HKCU\Environment" /v Path /t REG_EXPAND_SZ /d "%newUserPath%" /f >nul
     echo Added %installDir% to user PATH.
 ) else (
     echo Path %installDir% already in user PATH.
@@ -101,6 +106,7 @@ color 0A
 echo ===============================
 echo RX was installed successfully.
 echo You can now use the 'rx' command or run .rx files directly.
+echo You might need to restart your session or computer for PATH changes to take effect.
 echo ===============================
 pause
 endlocal
