@@ -1,4 +1,4 @@
-RX is a lightweight and efficient scripting language designed for ease of use and low system impact. With a clean, beginner-friendly syntax, it allows developers to build applications quickly without overloading system resources. RX is ideal for lightweight scripting, automation, and development on machines with limited performance.
+RX is a lightweight and very fast scripting language designed for ease of use and low system impact. With a clean, beginner-friendly syntax, it allows developers to build anything quickly without overloading system resources. RX is ideal for lightweight scripting, automation, and development on machines with limited performance.
 ---
 
 # 💪 Usage:
@@ -10,18 +10,30 @@ RX is a lightweight and efficient scripting language designed for ease of use an
 
 ---
 
+# 🙂 Performance
+> ~1.1/Mb RAM Usage
+> 0% CPU Usage
+> Scripts take up to max. 1MB
+
+---
+
 # 💻 Installation:
-> Step 1: Go to releases
-> 
-> Step 2: Download the newest Installer from the newest Release
-> 
-> Step 3: Run the installer and wait to finish his job.
-> 
-> Step 4: Now RX Scripting Language is installed on your computer and you can use it!
+> Windows:
+> Step 1: Run the command below to install!
+> ```curl -L https://raw.githubusercontent.com/x4raynixx/RX-Scripting/master/install/install.cmd -o install.cmd && install.cmd```
+>
+> Linux, MacOS, Termux, Raspberry Pi
+> Step 1: Run the command bellow in a terminal!
+> ```curl -fsSL https://raw.githubusercontent.com/x4raynixx/RX-Scripting/master/install.sh | bash```
 
 ---
 
 # 🛠️ Build it yourself
+
+Requirements:
+`llvm-mingw-20250528-ucrt-x86_64` in tools folder
+`gcc` installed on your system and maybe some other stuff
+
 Run the following command in your terminal:
 ```
 git clone https://github.com/x4raynixx/RX-Scripting.git
@@ -30,12 +42,10 @@ cd RX-Scripting
 
 Build for windows:
 ```
-dotnet publish -c Release -r win-x64 -p:PublishSingleFile=true -p:IncludeAllContentForSelfExtract=true --self-contained true /p:PublishTrimmed=true /p:DebugType=None /p:DebugSymbols=false -o ./publish
+./build.bat
 ```
 
 Build for Linux:
 ```
-dotnet publish -c Release -r linux-x64 -p:PublishSingleFile=true -p:IncludeAllContentForSelfExtract=true --self-contained true /p:PublishTrimmed=true /p:DebugType=None /p:DebugSymbols=false -o ./publish
+./build.sh
 ```
-
-Output: publish/rx.exe
