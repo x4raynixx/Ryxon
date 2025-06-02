@@ -1,7 +1,6 @@
 @echo off
 cls
-
-setlocal
+setlocal enabledelayedexpansion
 
 ver | findstr /i "windows" >nul
 if errorlevel 1 (
@@ -16,18 +15,18 @@ if defined PROCESSOR_ARCHITECTURE (
     set "arch=%PROCESSOR_ARCHITECTURE%"
 )
 
-if "%arch%"=="AMD64" (
+if /i "%arch%"=="AMD64" (
     set "file=rx_x86_64.exe"
     set "archPretty=x86_64 (AMD64)"
-) else if "%arch%"=="ARM64" (
+) else if /i "%arch%"=="ARM64" (
     set "file=rx_arm64.exe"
     set "archPretty=ARM64"
-) else if "%arch%"=="x86" (
+) else if /i "%arch%"=="x86" (
     set "file=rx_x86.exe"
     set "archPretty=x86"
 ) else (
     color 0C
-    echo Unsupported architecture: %arch%
+    echo Unknown architecture: %arch%
     pause
     exit /b
 )
@@ -37,35 +36,71 @@ for /f "tokens=4-5 delims=[.] " %%a in ('ver') do (
 )
 
 echo ===============================
-echo Detected Architecture: %archPretty%
+echo Detected architecture: %archPretty%
 echo System: Windows
-echo OS Version: %osVersion%
+echo OS version: %osVersion%
 echo ===============================
 
 net session >nul 2>&1
 if %errorLevel% neq 0 (
+    echo Running as administrator...
     powershell -Command "Start-Process -FilePath '%~f0' -Verb runAs -Wait"
     exit /b
 )
 
 set "installDir=%ProgramFiles%\RX"
-if not exist "%installDir%" mkdir "%installDir%"
+if not exist "%installDir%" (
+    mkdir "%installDir%"
+    echo Created installation directory: %installDir%
+)
 
 color 0E
+echo Downloading %file%...
 curl -L -o "%installDir%\rx.exe" "https://github.com/x4raynixx/RX-Scripting/raw/master/install/%file%"
+if errorlevel 1 (
+    color 0C
+    echo Download failed!
+    pause
+    exit /b
+)
+echo Download completed.
 
 echo Updating system PATH...
-color 0A
-setx PATH "%PATH%;%installDir%" >nul
+for /f "usebackq tokens=2*" %%a in (`reg query "HKLM\SYSTEM\CurrentControlSet\Control\Session Manager\Environment" /v Path 2^>nul ^| findstr "Path"`) do (
+    set "machinePath=%%b"
+)
+echo %machinePath% | find /i "%installDir%" >nul
+if errorlevel 1 (
+    reg add "HKLM\SYSTEM\CurrentControlSet\Control\Session Manager\Environment" /v Path /t REG_EXPAND_SZ /d "%machinePath%;%installDir%" /f >nul
+    echo Added %installDir% to system PATH (machine).
+) else (
+    echo Path %installDir% already in system PATH.
+)
 
-assoc .rx=RXFile
-ftype RXFile="%installDir%\rx.exe" "%%1"
+set "userPath=%PATH%"
+echo %userPath% | find /i "%installDir%" >nul
+if errorlevel 1 (
+    setx PATH "%userPath%;%installDir%" >nul
+    echo Added %installDir% to user PATH.
+) else (
+    echo Path %installDir% already in user PATH.
+)
+
+echo Associating .rx extension and default application...
+
+reg add "HKCR\.rx" /ve /d "RXFile" /f >nul
+reg add "HKCR\RXFile" /ve /d "RX Scripting Language" /f >nul
+reg add "HKCR\RXFile\shell\open\command" /ve /d "\"%installDir%\\rx.exe\" \"%%1\"" /f >nul
+reg add "HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer\FileExts\.rx\UserChoice" /v Progid /d RXFile /f >nul
+
+echo Association complete.
 
 cls
 color 0A
 echo ===============================
-echo RX installed successfully.
+echo RX was installed successfully.
+echo You can now use the 'rx' command or run .rx files directly.
 echo ===============================
 pause
-color 7
 endlocal
+exit /b
