@@ -1,8 +1,5 @@
 @echo off
 cls
-echo ===============================
-echo     RX INSTALLER
-echo ===============================
 
 setlocal
 
@@ -70,4 +67,5 @@ echo ===============================
 echo RX installed successfully.
 echo ===============================
 pause
+color 0
 endlocal
