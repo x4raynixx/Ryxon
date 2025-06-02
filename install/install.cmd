@@ -31,9 +31,8 @@ if /i "%arch%"=="AMD64" (
     exit /b
 )
 
-for /f "tokens=4-5 delims=[.] " %%a in ('ver') do (
-    set "osVersion=%%a.%%b"
-)
+for /f "tokens=*" %%a in ('ver') do set "osVersionLine=%%a"
+for /f "tokens=3 delims=[]" %%b in ("%osVersionLine%") do set "osVersion=%%b"
 
 echo ===============================
 echo Detected architecture: %archPretty%
@@ -42,7 +41,7 @@ echo OS version: %osVersion%
 echo ===============================
 
 net session >nul 2>&1
-if %errorLevel% neq 0 (
+if %errorlevel% neq 0 (
     echo Running as administrator...
     powershell -Command "Start-Process -FilePath '%~f0' -Verb runAs -Wait"
     exit /b
@@ -90,16 +89,18 @@ echo Associating .rx extension and default application...
 
 reg add "HKCR\.rx" /ve /d "RXFile" /f >nul
 reg add "HKCR\RXFile" /ve /d "RX Scripting Language" /f >nul
+reg add "HKCR\RXFile\DefaultIcon" /ve /d "%installDir%\\rx.exe,0" /f >nul
 reg add "HKCR\RXFile\shell\open\command" /ve /d "\"%installDir%\\rx.exe\" \"%%1\"" /f >nul
 reg add "HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer\FileExts\.rx\UserChoice" /v Progid /d RXFile /f >nul
 
-echo Association complete.
+reg add "HKCR\.rx\ShellNew" /v NullFile /f >nul
+reg add "HKCR\.rx\ShellNew" /v ItemName /d "RX Script" /f >nul
 
 cls
 color 0A
 echo ===============================
 echo RX was installed successfully.
-echo Now, you can use 'rx' command or run .rx files directly.
+echo You can now use the 'rx' command or run .rx files directly.
 echo ===============================
 pause
 endlocal
