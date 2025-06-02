@@ -21,14 +21,14 @@
 > 
 > Step 1: Run the command below in CMD to install!
 > 
-> ```curl -L https://raw.githubusercontent.com/x4raynixx/RX-Scripting/master/install/install.cmd -o install.cmd && install.cmd```
+> ```curl -L https://raw.githubusercontent.com/x4raynixx/Ryxon/master/install/install.cmd -o install.cmd && install.cmd```
 >
 > 
 > Linux, MacOS, Termux, Raspberry Pi
 > 
 > Step 1: Run the command bellow in a shell!
 > 
-> ```curl -fsSL https://raw.githubusercontent.com/x4raynixx/RX-Scripting/master/install.sh | bash```
+> ```curl -fsSL https://raw.githubusercontent.com/x4raynixx/Ryxon/master/install.sh | bash```
 
 ---
 
@@ -43,8 +43,8 @@ Requirements:
 Run the following command in your terminal:
 
 ```
-git clone https://github.com/x4raynixx/RX-Scripting.git
-cd RX-Scripting
+git clone https://github.com/x4raynixx/Ryxon.git
+cd Ryxon
 ```
 
 ---
