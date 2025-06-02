@@ -1,60 +1,105 @@
 @echo off
 setlocal enabledelayedexpansion
 
-echo Building...
-
-if not exist temp mkdir temp
+echo [*] Preparing folders...
+if not exist tools mkdir tools
 if not exist install mkdir install
+if not exist temp mkdir temp
 
-set PLATFORM=windows
-
+set LLVM_MINGW_DIR=tools\llvm-mingw-20250528-ucrt-x86_64
 set COMMON_FLAGS=-std=c++17 -Wall -Wextra -O2 -Isrc
+set SRC_FILES=src\*.cpp
 
-echo Generating icon resource...
+if not exist %LLVM_MINGW_DIR% (
+    echo [*] LLVM-Mingw x86_64 not found, downloading...
+    powershell -Command ^
+        "$r = Invoke-RestMethod 'https://api.github.com/repos/mstorsjo/llvm-mingw/releases/llvm-mingw-20250528-ucrt-x86_64';" ^
+        "$u = ($r.assets | Where-Object { $_.name -like '*ucrt-x86_64.zip' })[0].browser_download_url;" ^
+        "Invoke-WebRequest $u -OutFile 'tools\llvm-mingw.zip'"
+
+    echo [*] Extracting LLVM-Mingw...
+    powershell -Command "Expand-Archive -Path 'tools\llvm-mingw.zip' -DestinationPath 'tools' -Force"
+    for /d %%D in (tools\llvm-mingw-*) do (
+        ren "%%D" llvm-mingw
+    )
+    del tools\llvm-mingw.zip
+    echo [✓] LLVM-Mingw x86_64 installed
+) else (
+    echo [✓] LLVM-Mingw x86_64 already present
+)
+
+set PATH=%CD%\%LLVM_MINGW_DIR%\bin;%PATH%
+
 if exist rx.ico (
-    echo IDI_ICON1 ICON "rx.ico" > temp\icon.rc
-    windres -i temp\icon.rc -o temp\icon.o
+    echo IDI_ICON1 ICON "rx.ico" > temp\icon_x86_64.rc
+    windres --target=pe-x86-64 temp\icon_x86_64.rc temp\icon_x86_64.o
+
+    echo IDI_ICON1 ICON "rx.ico" > temp\icon_x86.rc
+    windres --target=pe-i386 temp\icon_x86.rc temp\icon_x86.o
+
+    echo [*] Icon resources compiled
 ) else (
-    echo No icon.ico found, skipping icon...
+    echo [-] rx.ico not found – skipping icons
 )
 
-echo Building for Windows...
-if exist temp\icon.o (
-    g++ %COMMON_FLAGS% src\*.cpp temp\icon.o -o install\rx.exe
+echo [*] Building native binary...
+if exist temp\icon_x86_64.o (
+    g++ %COMMON_FLAGS% %SRC_FILES% temp\icon_x86_64.o -static -static-libgcc -static-libstdc++ -o install\rx.exe
 ) else (
-    g++ %COMMON_FLAGS% src\*.cpp -o install\rx.exe
+    g++ %COMMON_FLAGS% %SRC_FILES% -static -static-libgcc -static-libstdc++ -o install\rx.exe
 )
-if %ERRORLEVEL% NEQ 0 (
-    echo Build failed...
-    exit /b %ERRORLEVEL%
+echo [✓] Built: install\rx.exe
+
+echo [*] Building x86_64...
+if exist temp\icon_x86_64.o (
+    x86_64-w64-mingw32-g++ %COMMON_FLAGS% %SRC_FILES% temp\icon_x86_64.o -static -static-libgcc -static-libstdc++ -o install\rx_x86_64.exe
+) else (
+    x86_64-w64-mingw32-g++ %COMMON_FLAGS% %SRC_FILES% -static -static-libgcc -static-libstdc++ -o install\rx_x86_64.exe
 )
-echo Built: install\rx.exe
+if %ERRORLEVEL%==0 (
+    echo [✓] Built: install\rx_x86_64.exe
+) else (
+    echo [X] Failed to build x86_64
+)
 
-if "%1"=="all" (
-    echo Building for all platforms...
+echo [*] Building x86...
+if exist temp\icon_x86.o (
+    i686-w64-mingw32-g++ %COMMON_FLAGS% %SRC_FILES% temp\icon_x86.o -static -static-libgcc -static-libstdc++ -o install\rx_x86.exe
+) else (
+    i686-w64-mingw32-g++ %COMMON_FLAGS% %SRC_FILES% -static -static-libgcc -static-libstdc++ -o install\rx_x86.exe
+)
+if %ERRORLEVEL%==0 (
+    echo [✓] Built: install\rx_x86.exe
+) else (
+    echo [X] Failed to build x86
+)
 
-    where x86_64-w64-mingw32-g++ >nul 2>nul
-    if %ERRORLEVEL%==0 (
-        echo Building for Windows...
-        if exist temp\icon.o (
-            x86_64-w64-mingw32-g++ %COMMON_FLAGS% src\*.cpp temp\icon.o -o install\rx_cross.exe
-        ) else (
-            x86_64-w64-mingw32-g++ %COMMON_FLAGS% src\*.cpp -o install\rx_cross.exe
-        )
+echo [*] Building ARM64...
+if exist temp\icon_arm64.o (
+    aarch64-w64-mingw32-g++ %COMMON_FLAGS% %SRC_FILES% temp\icon_arm64.o -static -static-libgcc -static-libstdc++ -o install\rx_arm64.exe
+) else (
+    aarch64-w64-mingw32-g++ %COMMON_FLAGS% %SRC_FILES% -static -static-libgcc -static-libstdc++ -o install\rx_arm64.exe
+)
+if %ERRORLEVEL%==0 (
+    echo [✓] Built: install\rx_arm64.exe
+    if exist rx.ico (
+        echo [*] Adding icon to ARM64 executable...
+        tools\rcedit.exe install\rx_arm64.exe --set-icon rx.ico
         if %ERRORLEVEL%==0 (
-            echo ✓ Windows cross-build complete
+            echo [✓] Icon added to ARM64 executable
+        ) else (
+            echo [X] Failed to add icon to ARM64 executable
         )
     )
+) else (
+    echo [X] Failed to build ARM64
 )
 
-echo Testing the build...
+echo [*] Testing native build...
 echo print("Hello from RX!") > test.rx
-
-if exist install\rx.exe (
-    echo Running test...
-    install\rx.exe test.rx
-)
-
+install\rx.exe test.rx
 del test.rx
-rmdir /s /q temp
-echo Build finished successfully
+
+rmdir /s /q temp >nul 2>nul
+
+echo [✓] All builds completed successfully!
