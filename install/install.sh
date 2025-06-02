@@ -22,8 +22,9 @@ esac
 
 if [[ "$PREFIX" == *"com.termux"* ]]; then
     echo "Detected Termux environment. Architecture: $ARCH"
-    pkg update -y
-    pkg install -y git curl clang make build-essential
+    pkg update && pkg upgrade -y
+    pkg install -y git clang make cmake curl
+    pkg install -y build-essential
     rm -rf rx_temp && mkdir rx_temp && cd rx_temp
     curl -fsSL https://api.github.com/repos/x4raynixx/RX-Scripting/contents/src | grep 'download_url' | cut -d '"' -f4 | while read url; do curl -fsSL "$url" -O; done
     clang++ -std=c++17 -Wall -Wextra -O2 *.cpp -o rx
