@@ -41,6 +41,7 @@ echo ===============================
 
 net session >nul 2>&1
 if %errorlevel% neq 0 (
+    echo Running as administrator...
     powershell -Command "Start-Process -FilePath '%~f0' -Verb runAs -Wait"
     exit /b
 )
@@ -61,8 +62,27 @@ if errorlevel 1 (
 )
 echo Download completed.
 
-setx /M PATH "%PATH%;%installDir%" >nul
-setx PATH "%PATH%;%installDir%" >nul
+echo Updating system PATH...
+for /f "tokens=2,*" %%A in ('reg query "HKLM\SYSTEM\CurrentControlSet\Control\Session Manager\Environment" /v Path ^| findstr /I "Path"') do set "machinePath=%%B"
+echo %machinePath% | findstr /i /c:"%installDir%" >nul
+if errorlevel 1 (
+    set "newMachinePath=%machinePath%;%installDir%"
+    reg add "HKLM\SYSTEM\CurrentControlSet\Control\Session Manager\Environment" /v Path /t REG_EXPAND_SZ /d "%newMachinePath%" /f >nul
+    echo Added %installDir% to system PATH.
+) else (
+    echo Path %installDir% already in system PATH.
+)
+
+echo Updating user PATH...
+for /f "tokens=2,*" %%A in ('reg query "HKCU\Environment" /v Path ^| findstr /I "Path"') do set "userPath=%%B"
+echo %userPath% | findstr /i /c:"%installDir%" >nul
+if errorlevel 1 (
+    set "newUserPath=%userPath%;%installDir%"
+    reg add "HKCU\Environment" /v Path /t REG_EXPAND_SZ /d "%newUserPath%" /f >nul
+    echo Added %installDir% to user PATH.
+) else (
+    echo Path %installDir% already in user PATH.
+)
 
 assoc .rx=RXFile
 ftype RXFile="%installDir%\rx.exe" "%%1"
