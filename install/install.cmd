@@ -99,7 +99,7 @@ cls
 color 0A
 echo ===============================
 echo RX was installed successfully.
-echo You can now use the 'rx' command or run .rx files directly.
+echo Now, you can use 'rx' command or run .rx files directly.
 echo ===============================
 pause
 endlocal
