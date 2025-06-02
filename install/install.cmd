@@ -40,8 +40,7 @@ echo OS version: %osVersion%
 echo ===============================
 
 net session >nul 2>&1
-if %errorLevel% neq 0 (
-    echo Running as administrator...
+if %errorlevel% neq 0 (
     powershell -Command "Start-Process -FilePath '%~f0' -Verb runAs -Wait"
     exit /b
 )
@@ -64,27 +63,20 @@ if errorlevel 1 (
 echo Download completed.
 
 echo Updating system PATH...
-set "machinePath="
-for /f "usebackq tokens=2,* skip=2" %%a in (`reg query "HKLM\SYSTEM\CurrentControlSet\Control\Session Manager\Environment" /v Path 2^>nul`) do (
-    if /i "%%a"=="Path" set "machinePath=%%b"
-)
-
-echo %machinePath% | findstr /i /c:"%installDir%" >nul
+reg query "HKLM\SYSTEM\CurrentControlSet\Control\Session Manager\Environment" /v Path | findstr /i "%installDir%">nul
 if errorlevel 1 (
+    for /f "tokens=2,*" %%a in ('reg query "HKLM\SYSTEM\CurrentControlSet\Control\Session Manager\Environment" /v Path ^| findstr Path') do set "machinePath=%%b"
     set "newMachinePath=%machinePath%;%installDir%"
     reg add "HKLM\SYSTEM\CurrentControlSet\Control\Session Manager\Environment" /v Path /t REG_EXPAND_SZ /d "%newMachinePath%" /f >nul
-    echo Added %installDir% to system PATH (machine).
+    echo Added %installDir% to system PATH.
 ) else (
     echo Path %installDir% already in system PATH.
 )
 
-set "userPath="
-for /f "usebackq tokens=2,* skip=2" %%a in (`reg query "HKCU\Environment" /v Path 2^>nul`) do (
-    if /i "%%a"=="Path" set "userPath=%%b"
-)
-
-echo %userPath% | findstr /i /c:"%installDir%" >nul
+echo Updating user PATH...
+reg query "HKCU\Environment" /v Path | findstr /i "%installDir%">nul
 if errorlevel 1 (
+    for /f "tokens=2,*" %%a in ('reg query "HKCU\Environment" /v Path ^| findstr Path') do set "userPath=%%b"
     set "newUserPath=%userPath%;%installDir%"
     reg add "HKCU\Environment" /v Path /t REG_EXPAND_SZ /d "%newUserPath%" /f >nul
     echo Added %installDir% to user PATH.
@@ -93,28 +85,23 @@ if errorlevel 1 (
 )
 
 echo Associating .rx extension and default application...
-
 reg add "HKCR\.rx" /ve /d "RXFile" /f >nul
 reg add "HKCR\RXFile" /ve /d "RX Scripting Language" /f >nul
 reg add "HKCR\RXFile\DefaultIcon" /ve /d "%installDir%\rx.exe,0" /f >nul
-reg add "HKCR\RXFile\shell\open\command" /ve /d "\"%installDir%\\rx.exe\" \"%%1\"" /f >nul
+reg add "HKCR\RXFile\shell\open\command" /ve /d "\"%installDir%\rx.exe\" \"%%1\"" /f >nul
 reg add "HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer\FileExts\.rx\UserChoice" /v Progid /d RXFile /f >nul
 
 echo Adding RX Script to New menu...
-
-reg add "HKCR\.rx" /ve /d "RXFile" /f >nul
-reg add "HKCR\RXFile" /ve /d "RX Script" /f >nul
-reg add "HKCR\RXFile\ShellNew" /ve /d "" /f >nul
-reg add "HKCR\RXFile\ShellNew\NullFile" /f >nul
-reg add "HKCR\RXFile\DefaultIcon" /ve /d "%installDir%\rx.exe,0" /f >nul
+reg add "HKCR\.rx\ShellNew" /v NullFile /f >nul
+reg add "HKCR\.rx\ShellNew" /v ItemName /d "RX Script" /f >nul
 
 cls
 color 0A
 echo ===============================
 echo RX was installed successfully.
-echo Now, you can use 'rx' command or run .rx files directly.
+echo You can now use the 'rx' command or run .rx files directly.
 echo You can also create new RX Script files from New menu.
-echo RX Scripting Language :D
+echo :D
 echo ===============================
 pause
 endlocal
