@@ -19,14 +19,14 @@
 # 💻 Installation:
 > Windows:
 > 
-> Step 1: Run the command below to install!
+> Step 1: Run the command below in CMD to install!
 > 
 > ```curl -L https://raw.githubusercontent.com/x4raynixx/RX-Scripting/master/install/install.cmd -o install.cmd && install.cmd```
 >
 > 
 > Linux, MacOS, Termux, Raspberry Pi
 > 
-> Step 1: Run the command bellow in a terminal!
+> Step 1: Run the command bellow in a shell!
 > 
 > ```curl -fsSL https://raw.githubusercontent.com/x4raynixx/RX-Scripting/master/install.sh | bash```
 
