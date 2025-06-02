@@ -69,9 +69,7 @@ for /f "usebackq tokens=2,* skip=2" %%a in (`reg query "HKLM\SYSTEM\CurrentContr
     if /i "%%a"=="Path" set "machinePath=%%b"
 )
 
-if not defined machinePath set "machinePath="
-
-echo %machinePath% | find /i "%installDir%" >nul
+echo %machinePath% | findstr /i /c:"%installDir%" >nul
 if errorlevel 1 (
     set "newMachinePath=%machinePath%;%installDir%"
     reg add "HKLM\SYSTEM\CurrentControlSet\Control\Session Manager\Environment" /v Path /t REG_EXPAND_SZ /d "%newMachinePath%" /f >nul
@@ -85,9 +83,7 @@ for /f "usebackq tokens=2,* skip=2" %%a in (`reg query "HKCU\Environment" /v Pat
     if /i "%%a"=="Path" set "userPath=%%b"
 )
 
-if not defined userPath set "userPath="
-
-echo %userPath% | find /i "%installDir%" >nul
+echo %userPath% | findstr /i /c:"%installDir%" >nul
 if errorlevel 1 (
     set "newUserPath=%userPath%;%installDir%"
     reg add "HKCU\Environment" /v Path /t REG_EXPAND_SZ /d "%newUserPath%" /f >nul
