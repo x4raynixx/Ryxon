@@ -39,5 +39,6 @@ ftype RXFile="%installDir%\rx.exe" "%%1"
 
 cls
 color 0A
+cls
 echo RX installed successfully.
 pause
