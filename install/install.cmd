@@ -61,19 +61,14 @@ if errorlevel 1 (
 )
 echo Download completed.
 
-echo Updating system PATH...
 setx /M PATH "%PATH%;%installDir%" >nul
-
-echo Updating user PATH...
 setx PATH "%PATH%;%installDir%" >nul
 
-echo Associating .rx extension and default application...
 assoc .rx=RXFile
 ftype RXFile="%installDir%\rx.exe" "%%1"
 reg add "HKCR\RXFile" /ve /d "RX Scripting Language" /f >nul
 reg add "HKCR\RXFile\DefaultIcon" /ve /d "%installDir%\rx.exe,0" /f >nul
 
-echo Creating template for New > RX Script...
 set "templateDir=%ProgramData%\Microsoft\Windows\Templates"
 if not exist "%templateDir%" mkdir "%templateDir%"
 type nul > "%templateDir%\RX Script.rx"
