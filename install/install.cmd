@@ -41,7 +41,6 @@ echo ===============================
 
 net session >nul 2>&1
 if %errorlevel% neq 0 (
-    echo Running as administrator...
     powershell -Command "Start-Process -FilePath '%~f0' -Verb runAs -Wait"
     exit /b
 )
@@ -49,7 +48,6 @@ if %errorlevel% neq 0 (
 set "installDir=%ProgramFiles%\RX"
 if not exist "%installDir%" (
     mkdir "%installDir%"
-    echo Created installation directory: %installDir%
 )
 
 color 0E
@@ -65,11 +63,9 @@ echo Download completed.
 
 echo Updating system PATH...
 setx /M PATH "%PATH%;%installDir%" >nul
-echo Added %installDir% to system PATH.
 
 echo Updating user PATH...
 setx PATH "%PATH%;%installDir%" >nul
-echo Added %installDir% to user PATH.
 
 echo Associating .rx extension and default application...
 reg add "HKCR\.rx" /ve /d "RXFile" /f >nul
@@ -80,14 +76,13 @@ reg add "HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer\FileExts\.rx\Us
 
 echo Adding RX Script to New menu...
 reg add "HKCR\.rx\ShellNew" /v NullFile /f >nul
-reg add "HKCR\.rx\ShellNew" /v ItemName /d "RX Script" /f >nul
+reg add "HKCR\.rx\ShellNew" /v MenuText /d "RX Script" /f >nul
 
 cls
 color 0A
 echo ===============================
 echo RX was installed successfully.
 echo You can now use the 'rx' command or run .rx files directly.
-echo You can also create new RX Script files from the New menu.
 echo ===============================
 pause
 endlocal
