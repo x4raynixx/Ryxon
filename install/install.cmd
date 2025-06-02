@@ -41,6 +41,7 @@ echo ===============================
 
 net session >nul 2>&1
 if %errorlevel% neq 0 (
+    echo Running as administrator...
     powershell -Command "Start-Process -FilePath '%~f0' -Verb runAs -Wait"
     exit /b
 )
@@ -63,26 +64,12 @@ if errorlevel 1 (
 echo Download completed.
 
 echo Updating system PATH...
-reg query "HKLM\SYSTEM\CurrentControlSet\Control\Session Manager\Environment" /v Path | findstr /i "%installDir%">nul
-if errorlevel 1 (
-    for /f "tokens=2,*" %%a in ('reg query "HKLM\SYSTEM\CurrentControlSet\Control\Session Manager\Environment" /v Path ^| findstr Path') do set "machinePath=%%b"
-    set "newMachinePath=%machinePath%;%installDir%"
-    reg add "HKLM\SYSTEM\CurrentControlSet\Control\Session Manager\Environment" /v Path /t REG_EXPAND_SZ /d "%newMachinePath%" /f >nul
-    echo Added %installDir% to system PATH.
-) else (
-    echo Path %installDir% already in system PATH.
-)
+setx /M PATH "%PATH%;%installDir%" >nul
+echo Added %installDir% to system PATH.
 
 echo Updating user PATH...
-reg query "HKCU\Environment" /v Path | findstr /i "%installDir%">nul
-if errorlevel 1 (
-    for /f "tokens=2,*" %%a in ('reg query "HKCU\Environment" /v Path ^| findstr Path') do set "userPath=%%b"
-    set "newUserPath=%userPath%;%installDir%"
-    reg add "HKCU\Environment" /v Path /t REG_EXPAND_SZ /d "%newUserPath%" /f >nul
-    echo Added %installDir% to user PATH.
-) else (
-    echo Path %installDir% already in user PATH.
-)
+setx PATH "%PATH%;%installDir%" >nul
+echo Added %installDir% to user PATH.
 
 echo Associating .rx extension and default application...
 reg add "HKCR\.rx" /ve /d "RXFile" /f >nul
@@ -100,8 +87,7 @@ color 0A
 echo ===============================
 echo RX was installed successfully.
 echo You can now use the 'rx' command or run .rx files directly.
-echo You can also create new RX Script files from New menu.
-echo :D
+echo You can also create new RX Script files from the New menu.
 echo ===============================
 pause
 endlocal
