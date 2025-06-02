@@ -68,15 +68,18 @@ echo Updating user PATH...
 setx PATH "%PATH%;%installDir%" >nul
 
 echo Associating .rx extension and default application...
-reg add "HKCR\.rx" /ve /d "RXFile" /f >nul
+assoc .rx=RXFile
+ftype RXFile="%installDir%\rx.exe" "%%1"
 reg add "HKCR\RXFile" /ve /d "RX Scripting Language" /f >nul
 reg add "HKCR\RXFile\DefaultIcon" /ve /d "%installDir%\rx.exe,0" /f >nul
-reg add "HKCR\RXFile\shell\open\command" /ve /d "\"%installDir%\rx.exe\" \"%%1\"" /f >nul
-reg add "HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer\FileExts\.rx\UserChoice" /v Progid /d RXFile /f >nul
 
-echo Adding RX Script to New menu...
-reg add "HKCR\.rx\ShellNew" /ve /d "RX Script" /f >nul
-reg add "HKCR\.rx\ShellNew" /v NullFile /f >nul
+echo Creating template for New > RX Script...
+set "templateDir=%ProgramData%\Microsoft\Windows\Templates"
+if not exist "%templateDir%" mkdir "%templateDir%"
+type nul > "%templateDir%\RX Script.rx"
+
+reg add "HKCR\.rx" /ve /d "RXFile" /f >nul
+reg add "HKCR\.rx\ShellNew" /v FileName /d "RX Script.rx" /f >nul
 
 cls
 color 0A
