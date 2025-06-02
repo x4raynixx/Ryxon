@@ -2,11 +2,11 @@ CXX = g++
 CXXFLAGS = -std=c++17 -Wall -Wextra -pedantic -O2 -I./src
 SRCDIR = src
 BUILDDIR = build
-BINDIR = bin
+installDIR = install
 
 SOURCES = $(wildcard $(SRCDIR)/*.cpp)
 OBJECTS = $(SOURCES:$(SRCDIR)/%.cpp=$(BUILDDIR)/%.o)
-TARGET = $(BINDIR)/rx
+TARGET = $(installDIR)/rx
 
 UNAME_S := $(shell uname -s)
 ifeq ($(UNAME_S),Linux)
@@ -26,13 +26,13 @@ all: $(TARGET)$(TARGET_SUFFIX)
 $(BUILDDIR):
 	mkdir -p $(BUILDDIR)
 
-$(BINDIR):
-	mkdir -p $(BINDIR)
+$(installDIR):
+	mkdir -p $(installDIR)
 
 $(BUILDDIR)/%.o: $(SRCDIR)/%.cpp | $(BUILDDIR)
 	$(CXX) $(CXXFLAGS) -c $< -o $@
 
-$(TARGET)$(TARGET_SUFFIX): $(OBJECTS) | $(BINDIR)
+$(TARGET)$(TARGET_SUFFIX): $(OBJECTS) | $(installDIR)
 	$(CXX) $(OBJECTS) -o $@
 
 windows: 
@@ -51,14 +51,14 @@ build_all: clean
 	-$(MAKE) macos
 
 clean:
-	rm -rf $(BUILDDIR) $(BINDIR)
+	rm -rf $(BUILDDIR) $(installDIR)
 
 install: $(TARGET)$(TARGET_SUFFIX)
-	cp $(TARGET)$(TARGET_SUFFIX) /usr/local/bin/rx
-	chmod +x /usr/local/bin/rx
+	cp $(TARGET)$(TARGET_SUFFIX) /usr/local/install/rx
+	chmod +x /usr/local/install/rx
 
 uninstall:
-	rm -f /usr/local/bin/rx
+	rm -f /usr/local/install/rx
 
 test: $(TARGET)$(TARGET_SUFFIX)
 	@echo 'print("Hello, RX World!")' > test.rx
