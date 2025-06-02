@@ -66,7 +66,7 @@ setx PATH "%PATH%;%installDir%" >nul
 
 assoc .rx=RXFile
 ftype RXFile="%installDir%\rx.exe" "%%1"
-reg add "HKCR\RXFile" /ve /d "RX Scripting Language" /f >nul
+reg add "HKCR\RXFile" /ve /d "RX Script" /f >nul
 reg add "HKCR\RXFile\DefaultIcon" /ve /d "%installDir%\rx.exe,0" /f >nul
 
 set "templateDir=%ProgramData%\Microsoft\Windows\Templates"
