@@ -35,7 +35,6 @@ if "%arch%"=="AMD64" (
     exit /b
 )
 
-rem Detect OS version (basic)
 for /f "tokens=4-5 delims=[.] " %%a in ('ver') do (
     set "osVersion=%%a.%%b"
 )
