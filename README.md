@@ -47,6 +47,8 @@ git clone https://github.com/x4raynixx/RX-Scripting.git
 cd RX-Scripting
 ```
 
+---
+
 Build for windows:
 
 ```
