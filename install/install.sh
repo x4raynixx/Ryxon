@@ -1,4 +1,5 @@
 #!/bin/bash
+
 set -e
 
 OS=""
@@ -25,7 +26,7 @@ if [[ "$PREFIX" == *"com.termux"* ]]; then
     pkg install -y git clang make cmake curl
     pkg install -y build-essential
     rm -rf rx_temp && mkdir rx_temp && cd rx_temp
-    curl -fsSL https://api.github.com/repos/x4raynixx/RX-Scripting/contents/src | grep 'download_url' | cut -d '"' -f4 | while read url; do curl -fsSL "$url" -O; done
+    curl -fsSL https://api.github.com/repos/x4raynixx/Ryxon/contents/src | grep 'download_url' | cut -d '"' -f4 | while read url; do curl -fsSL "$url" -O; done
     clang++ -std=c++17 -Wall -Wextra -O2 *.cpp -o rx
     mkdir -p ~/.local/bin
     mv rx ~/.local/bin/rx
@@ -53,7 +54,7 @@ if ! curl -fsSL "$URL" -o "$TMPFILE"; then
         sudo apt update && sudo apt install -y build-essential
     fi
     rm -rf rx_temp && mkdir rx_temp && cd rx_temp
-    curl -fsSL https://api.github.com/repos/x4raynixx/RX-Scripting/contents/src | grep 'download_url' | cut -d '"' -f4 | while read url; do curl -fsSL "$url" -O; done
+    curl -fsSL https://api.github.com/repos/x4raynixx/Ryxon/contents/src | grep 'download_url' | cut -d '"' -f4 | while read url; do curl -fsSL "$url" -O; done
     g++ -std=c++17 -Wall -Wextra -O2 *.cpp -o rx_build
     sudo mv rx_build /usr/local/bin/rx
     sudo chmod +x /usr/local/bin/rx

@@ -29,7 +29,7 @@ if [ -f "$INSTALL_PATH" ]; then
     fi
     source "$HOME/.bashrc" 2>/dev/null || true
     source "$HOME/.zshrc" 2>/dev/null || true
-    echo "RX-Scripting Language uninstalled."
+    echo "Ryxon Language uninstalled."
     echo "Restart terminal or run: source ~/.bashrc or source ~/.zshrc to apply changes"
 else
     echo "rx not found at $INSTALL_PATH, nothing to uninstall."
