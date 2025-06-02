@@ -6,7 +6,6 @@ echo ===============================
 
 setlocal
 
-rem Detect OS
 ver | findstr /i "windows" >nul
 if errorlevel 1 (
     color 0C
@@ -15,7 +14,6 @@ if errorlevel 1 (
     exit /b
 )
 
-rem Detect architecture
 set "arch="
 if defined PROCESSOR_ARCHITECTURE (
     set "arch=%PROCESSOR_ARCHITECTURE%"
@@ -57,7 +55,6 @@ if %errorLevel% neq 0 (
 set "installDir=%ProgramFiles%\RX"
 if not exist "%installDir%" mkdir "%installDir%"
 
-echo Downloading RX for architecture: %archPretty%
 color 0E
 curl -L -o "%installDir%\rx.exe" "https://github.com/x4raynixx/RX-Scripting/raw/master/install/%file%"
 
