@@ -1,6 +1,3 @@
-RX is a lightweight and very fast scripting language designed for ease of use and low system impact. With a clean, beginner-friendly syntax, it allows developers to build anything quickly without overloading system resources. RX is ideal for lightweight scripting, automation, and development on machines with limited performance.
----
-
 # 💪 Usage:
 > Step 1: Create a .rx file
 > 
