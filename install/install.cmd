@@ -1,32 +1,44 @@
 @echo off
-fsutil dirty query %systemdrive% >nul 2>&1
-if errorlevel 1 (
-    powershell -Command "Start-Process -Verb runAs -FilePath '%~f0'"
+net session >nul 2>&1
+if %errorLevel% neq 0 (
+    powershell -Command "Start-Process -FilePath '%~f0' -Verb runAs -Wait"
     exit /b
 )
 
-if not exist "C:\Program Files\RX" mkdir "C:\Program Files\RX"
-set RXPATH=C:\Program Files\RX
-
-set ARCH=
-for /f "tokens=2 delims==" %%a in ('wmic os get osarchitecture /value ^| find "="') do set ARCH=%%a
-
-set DOWNLOAD_URL=https://github.com/x4raynixx/RX-Scripting/raw/master/install/
-
-if "%PROCESSOR_ARCHITECTURE%"=="AMD64" (
-    set FILE=rx_x86_64.exe
-) else if "%PROCESSOR_ARCHITECTURE%"=="ARM64" (
-    set FILE=rx_arm64.exe
-) else (
-    set FILE=rx_x86.exe
+set "arch="
+if defined PROCESSOR_ARCHITECTURE (
+    set "arch=%PROCESSOR_ARCHITECTURE%"
 )
 
-curl -L -o "%RXPATH%\rx.exe" "%DOWNLOAD_URL%%FILE%"
+if "%arch%"=="AMD64" (
+    set "file=rx_x86_64.exe"
+) else if "%arch%"=="ARM64" (
+    set "file=rx_arm64.exe"
+) else if "%arch%"=="x86" (
+    set "file=rx_x86.exe"
+) else (
+    color 0C
+    echo Unsupported architecture: %arch%
+    pause
+    exit /b
+)
 
-reg add "HKLM\SYSTEM\CurrentControlSet\Control\Session Manager\Environment" /v Path /t REG_EXPAND_SZ /d "%Path%;%RXPATH%" /f
+set "installDir=%ProgramFiles%\RX"
+if not exist "%installDir%" mkdir "%installDir%"
+
+echo Downloading RX for architecture: %arch%
+color 0E
+curl -L -o "%installDir%\rx.exe" "https://github.com/x4raynixx/RX-Scripting/raw/master/install/%file%"
+
+echo Updating system PATH...
+color 0A
+setx PATH "%PATH%;%installDir%" >nul
 
 assoc .rx=RXFile
-ftype RXFile="%RXPATH%\rx.exe" "%%1"
+ftype RXFile="%installDir%\rx.exe" "%%1"
 
-echo RX installed successfully
+cls
+color 0A
+echo RX installed successfully.
+echo You can now use the 'rx' command or run .rx files directly.
 pause
