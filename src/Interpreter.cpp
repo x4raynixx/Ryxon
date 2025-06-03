@@ -1,4 +1,8 @@
 #include "Interpreter.h"
+#include "libraries/math/MathLibrary.h"
+#include "libraries/colors/ColorLibrary.h"
+#include "libraries/time/TimeLibrary.h"
+#include "libraries/system/SystemLibrary.h"
 #include <iostream>
 #include <stdexcept>
 #include <cstdlib>
@@ -6,8 +10,11 @@
 #include <cmath>
 #include <random>
 #include <unordered_map>
+#include <chrono>
+#include <ctime>
+#include <iomanip>
 
-// hepler functions for value creation
+// Helper functions for value creation
 Value makeNumber(double n) {
     return std::make_shared<ValueData>(n);
 }
@@ -24,7 +31,121 @@ Value makeObject(const std::unordered_map<std::string, Value>& o) {
     return std::make_shared<ValueData>(o);
 }
 
-Interpreter::Interpreter() : returnFlag(false), returnValue(makeNumber(0.0)) {}
+// Global helper functions for libraries
+double valueToNumber(const Value& value) {
+    if (value->type == ValueData::NUMBER) {
+        return value->number;
+    }
+    
+    switch (value->type) {
+        case ValueData::STRING: {
+            const std::string& str = *value->string;
+            if (str.empty()) return 0.0;
+            
+            // Szybka ścieżka dla prostych liczb
+            if (str.size() < 20) {
+                bool isNumeric = true;
+                bool hasDecimal = false;
+                bool hasSign = (str[0] == '-' || str[0] == '+');
+                
+                for (size_t i = hasSign ? 1 : 0; i < str.size(); ++i) {
+                    if (str[i] == '.') {
+                        if (hasDecimal) {
+                            isNumeric = false;
+                            break;
+                        }
+                        hasDecimal = true;
+                    } else if (str[i] < '0' || str[i] > '9') {
+                        isNumeric = false;
+                        break;
+                    }
+                }
+                
+                if (isNumeric) {
+                    try {
+                        return std::stod(str);
+                    } catch (...) {
+                        return 0.0;
+                    }
+                }
+            }
+            
+            // Fallback dla złożonych przypadków
+            try {
+                return std::stod(str);
+            } catch (...) {
+                return 0.0;
+            }
+        }
+        case ValueData::ARRAY:
+        case ValueData::OBJECT:
+            return 0.0;
+        default:
+            return 0.0;
+    }
+}
+
+// Zoptymalizuj funkcję valueToString dla lepszej wydajności
+std::string valueToString(const Value& value) {
+    switch (value->type) {
+        case ValueData::STRING:
+            return *value->string;
+        case ValueData::NUMBER: {
+            double num = value->number;
+            // Szybka ścieżka dla liczb całkowitych
+            if (num == static_cast<int>(num)) {
+                int intVal = static_cast<int>(num);
+                // Predefiniowane stringi dla małych liczb całkowitych
+                static const std::string smallInts[] = {
+                    "0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "10",
+                    "11", "12", "13", "14", "15", "16", "17", "18", "19", "20"
+                };
+                if (intVal >= 0 && intVal <= 20) {
+                    return smallInts[intVal];
+                }
+                return std::to_string(intVal);
+            }
+            
+            // Optymalizacja dla liczb zmiennoprzecinkowych
+            char buffer[32];
+            int len = snprintf(buffer, sizeof(buffer), "%.6g", num);
+            return std::string(buffer, len);
+        }
+        case ValueData::ARRAY: {
+            if (value->array->empty()) return "[]";
+            
+            std::string result = "[";
+            for (size_t i = 0; i < value->array->size(); ++i) {
+                if (i > 0) result += ", ";
+                result += valueToString((*value->array)[i]);
+            }
+            result += "]";
+            return result;
+        }
+        case ValueData::OBJECT: {
+            if (value->object->empty()) return "{}";
+            
+            std::string result = "{";
+            bool first = true;
+            for (const auto& prop : *value->object) {
+                if (!first) result += ", ";
+                result += prop.first + ": " + valueToString(prop.second);
+                first = false;
+            }
+            result += "}";
+            return result;
+        }
+    }
+    return "unknown";
+}
+
+Interpreter::Interpreter() : returnFlag(false), returnValue(makeNumber(0.0)) {
+    // Initialize all libraries
+    MathLibrary::initialize();
+    ColorLibrary::initialize();
+    TimeLibrary::initialize();
+    SystemLibrary::initialize();
+}
 
 void Interpreter::interpret(Program* program) {
     try {
@@ -34,6 +155,24 @@ void Interpreter::interpret(Program* program) {
     }
 }
 
+bool Interpreter::valueToBoolean(const Value& value) {
+    if (value->type == ValueData::NUMBER) {
+        return value->number != 0.0;
+    }
+    
+    switch (value->type) {
+        case ValueData::STRING:
+            return !value->string->empty();
+        case ValueData::ARRAY:
+            return !value->array->empty();
+        case ValueData::OBJECT:
+            return !value->object->empty();
+        default:
+            return false;
+    }
+}
+
+// Optimize binary operations for performance
 Value Interpreter::evaluate(Expression* expr) {
     if (auto numExpr = dynamic_cast<NumberExpression*>(expr)) {
         return makeNumber(numExpr->value);
@@ -44,25 +183,40 @@ Value Interpreter::evaluate(Expression* expr) {
     }
     
     if (auto colorExpr = dynamic_cast<ColorStringExpression*>(expr)) {
-        // ret color string with ANSI for immediate printing
+        // Return color string with ANSI for immediate printing
         std::string result;
         
-        // ANSI color codes
-        if (colorExpr->color == "red") result += "\033[31m";
-        else if (colorExpr->color == "green") result += "\033[32m";
-        else if (colorExpr->color == "yellow") result += "\033[33m";
-        else if (colorExpr->color == "blue") result += "\033[34m";
-        else if (colorExpr->color == "magenta") result += "\033[35m";
-        else if (colorExpr->color == "cyan") result += "\033[36m";
-        else if (colorExpr->color == "white") result += "\033[37m";
-        else if (colorExpr->color == "black") result += "\033[30m";
+        // ANSI color codes - optimized lookup
+        static const std::unordered_map<std::string, std::string> colorCodes = {
+            {"red", "\033[31m"},
+            {"green", "\033[32m"},
+            {"yellow", "\033[33m"},
+            {"blue", "\033[34m"},
+            {"magenta", "\033[35m"},
+            {"cyan", "\033[36m"},
+            {"white", "\033[37m"},
+            {"black", "\033[30m"},
+            {"bright_red", "\033[91m"},
+            {"bright_green", "\033[92m"},
+            {"bright_yellow", "\033[93m"},
+            {"bright_blue", "\033[94m"},
+            {"bright_magenta", "\033[95m"},
+            {"bright_cyan", "\033[96m"},
+            {"bright_white", "\033[97m"}
+        };
         
-        result += colorExpr->text + "\033[0m"; // add text and reset color
+        auto it = colorCodes.find(colorExpr->color);
+        if (it != colorCodes.end()) {
+            result += it->second;
+        }
+        
+        result += colorExpr->text + "\033[0m"; // Add text and reset color
         return makeString(result);
     }
     
     if (auto arrayExpr = dynamic_cast<ArrayExpression*>(expr)) {
         std::vector<Value> elements;
+        elements.reserve(arrayExpr->elements.size()); // Pre-allocate for performance
         for (const auto& elem : arrayExpr->elements) {
             elements.push_back(evaluate(elem.get()));
         }
@@ -71,12 +225,13 @@ Value Interpreter::evaluate(Expression* expr) {
     
     if (auto objExpr = dynamic_cast<ObjectExpression*>(expr)) {
         std::unordered_map<std::string, Value> properties;
+        properties.reserve(objExpr->properties.size()); // Pre-allocate for performance
         for (const auto& prop : objExpr->properties) {
             if (auto funcExpr = dynamic_cast<FunctionExpression*>(prop.second.get())) {
-                // store function in functions map with unique name
+                // Store function in functions map with unique name
                 std::string funcName = "__obj_method_" + prop.first + "_" + std::to_string(reinterpret_cast<uintptr_t>(funcExpr));
                 functions[funcName] = Function(funcExpr->parameters, &funcExpr->body);
-                properties[prop.first] = makeString(funcName); // stire function name as reference
+                properties[prop.first] = makeString(funcName); // Store function name as reference
             } else {
                 properties[prop.first] = evaluate(prop.second.get());
             }
@@ -85,14 +240,14 @@ Value Interpreter::evaluate(Expression* expr) {
     }
     
     if (auto funcExpr = dynamic_cast<FunctionExpression*>(expr)) {
-        // create unique function name and store it
+        // Create unique function name and store it
         std::string funcName = "__lambda_" + std::to_string(reinterpret_cast<uintptr_t>(funcExpr));
         functions[funcName] = Function(funcExpr->parameters, &funcExpr->body);
         return makeString(funcName);
     }
     
     if (auto idExpr = dynamic_cast<IdentifierExpression*>(expr)) {
-        // chcek if its a saved value first
+        // Check if it's a saved value first
         auto savedIt = savedValues.find(idExpr->name);
         if (savedIt != savedValues.end()) {
             return savedIt->second;
@@ -112,7 +267,7 @@ Value Interpreter::evaluate(Expression* expr) {
         }
         
         if (object->type == ValueData::ARRAY && memberExpr->property == "value") {
-            return object; // ret the array itself when accessing .value
+            return object; // Return the array itself when accessing .value
         }
         
         throw std::runtime_error("Cannot access property of non-object");
@@ -139,51 +294,205 @@ Value Interpreter::evaluate(Expression* expr) {
     }
     
     if (auto binExpr = dynamic_cast<BinaryExpression*>(expr)) {
+        // Szybka ścieżka dla operacji numerycznych
+        const std::string& op = binExpr->operator_;
+        
+        // Optymalizacja dla najczęstszych operacji w pętlach
+        if (op == "+" || op == "-" || op == "*" || op == "/" || 
+            op == "<" || op == ">" || op == "<=" || op == ">=") {
+            
+            // Sprawdź czy to prosta operacja na identyfikatorach i liczbach
+            auto* leftId = dynamic_cast<IdentifierExpression*>(binExpr->left.get());
+            auto* rightNum = dynamic_cast<NumberExpression*>(binExpr->right.get());
+            
+            // Szybka ścieżka dla i + 1, i - 1, i * 2, i / 2 itp.
+            if (leftId && rightNum) {
+                try {
+                    Value leftVal = getVariable(leftId->name);
+                    if (leftVal->type == ValueData::NUMBER) {
+                        if (op == "+") {
+                            return makeNumber(leftVal->number + rightNum->value);
+                        } else if (op == "-") {
+                            return makeNumber(leftVal->number - rightNum->value);
+                        } else if (op == "*") {
+                            return makeNumber(leftVal->number * rightNum->value);
+                        } else if (op == "/") {
+                            if (rightNum->value == 0) throw std::runtime_error("Division by zero");
+                            return makeNumber(leftVal->number / rightNum->value);
+                        } else if (op == "<") {
+                            return makeNumber(leftVal->number < rightNum->value ? 1.0 : 0.0);
+                        } else if (op == ">") {
+                            return makeNumber(leftVal->number > rightNum->value ? 1.0 : 0.0);
+                        } else if (op == "<=") {
+                            return makeNumber(leftVal->number <= rightNum->value ? 1.0 : 0.0);
+                        } else if (op == ">=") {
+                            return makeNumber(leftVal->number >= rightNum->value ? 1.0 : 0.0);
+                        }
+                    }
+                } catch (...) {
+                    // Fallback do standardowej ścieżki
+                }
+            }
+            
+            // Szybka ścieżka dla 1 + i, 2 * i itp.
+            auto* leftNum = dynamic_cast<NumberExpression*>(binExpr->left.get());
+            auto* rightId = dynamic_cast<IdentifierExpression*>(binExpr->right.get());
+            
+            if (leftNum && rightId) {
+                try {
+                    Value rightVal = getVariable(rightId->name);
+                    if (rightVal->type == ValueData::NUMBER) {
+                        if (op == "+") {
+                            return makeNumber(leftNum->value + rightVal->number);
+                        } else if (op == "-") {
+                            return makeNumber(leftNum->value - rightVal->number);
+                        } else if (op == "*") {
+                            return makeNumber(leftNum->value * rightVal->number);
+                        } else if (op == "/") {
+                            if (rightVal->number == 0) throw std::runtime_error("Division by zero");
+                            return makeNumber(leftNum->value / rightVal->number);
+                        } else if (op == "<") {
+                            return makeNumber(leftNum->value < rightVal->number ? 1.0 : 0.0);
+                        } else if (op == ">") {
+                            return makeNumber(leftNum->value > rightVal->number ? 1.0 : 0.0);
+                        } else if (op == "<=") {
+                            return makeNumber(leftNum->value <= rightVal->number ? 1.0 : 0.0);
+                        } else if (op == ">=") {
+                            return makeNumber(leftNum->value >= rightVal->number ? 1.0 : 0.0);
+                        }
+                    }
+                } catch (...) {
+                    // Fallback do standardowej ścieżki
+                }
+            }
+            
+            // Szybka ścieżka dla i + j, i - j itp. (dwie zmienne)
+            if (leftId && rightId) {
+                try {
+                    Value leftVal = getVariable(leftId->name);
+                    Value rightVal = getVariable(rightId->name);
+                    
+                    if (leftVal->type == ValueData::NUMBER && rightVal->type == ValueData::NUMBER) {
+                        if (op == "+") {
+                            return makeNumber(leftVal->number + rightVal->number);
+                        } else if (op == "-") {
+                            return makeNumber(leftVal->number - rightVal->number);
+                        } else if (op == "*") {
+                            return makeNumber(leftVal->number * rightVal->number);
+                        } else if (op == "/") {
+                            if (rightVal->number == 0) throw std::runtime_error("Division by zero");
+                            return makeNumber(leftVal->number / rightVal->number);
+                        } else if (op == "<") {
+                            return makeNumber(leftVal->number < rightVal->number ? 1.0 : 0.0);
+                        } else if (op == ">") {
+                            return makeNumber(leftVal->number > rightVal->number ? 1.0 : 0.0);
+                        } else if (op == "<=") {
+                            return makeNumber(leftVal->number <= rightVal->number ? 1.0 : 0.0);
+                        } else if (op == ">=") {
+                            return makeNumber(leftVal->number >= rightVal->number ? 1.0 : 0.0);
+                        }
+                    }
+                } catch (...) {
+                    // Fallback do standardowej ścieżki
+                }
+            }
+        }
+        
+        // Standardowa ścieżka dla innych operacji
         Value left = evaluate(binExpr->left.get());
         Value right = evaluate(binExpr->right.get());
         
-        if (binExpr->operator_ == "+") {
+        if (op == "+") {
+            // Szybka ścieżka dla number + number
+            if (left->type == ValueData::NUMBER && right->type == ValueData::NUMBER) {
+                return makeNumber(left->number + right->number);
+            }
+            
+            // Obsługa konkatenacji stringów
             if (left->type == ValueData::STRING || right->type == ValueData::STRING) {
                 return makeString(valueToString(left) + valueToString(right));
             }
+            
             return makeNumber(valueToNumber(left) + valueToNumber(right));
         }
-        if (binExpr->operator_ == "-") {
+        if (op == "-") {
+            // Szybka ścieżka dla number - number
+            if (left->type == ValueData::NUMBER && right->type == ValueData::NUMBER) {
+                return makeNumber(left->number - right->number);
+            }
             return makeNumber(valueToNumber(left) - valueToNumber(right));
         }
-        if (binExpr->operator_ == "*") {
+        if (op == "*") {
+            // Szybka ścieżka dla number * number
+            if (left->type == ValueData::NUMBER && right->type == ValueData::NUMBER) {
+                return makeNumber(left->number * right->number);
+            }
             return makeNumber(valueToNumber(left) * valueToNumber(right));
         }
-        if (binExpr->operator_ == "/") {
+        if (op == "/") {
+            // Szybka ścieżka dla number / number
+            if (left->type == ValueData::NUMBER && right->type == ValueData::NUMBER) {
+                if (right->number == 0) throw std::runtime_error("Division by zero");
+                return makeNumber(left->number / right->number);
+            }
             double rightVal = valueToNumber(right);
             if (rightVal == 0) throw std::runtime_error("Division by zero");
             return makeNumber(valueToNumber(left) / rightVal);
         }
-        if (binExpr->operator_ == "%") {
+        if (op == "%") {
+            // Szybka ścieżka dla number % number
+            if (left->type == ValueData::NUMBER && right->type == ValueData::NUMBER) {
+                return makeNumber(std::fmod(left->number, right->number));
+            }
             return makeNumber(std::fmod(valueToNumber(left), valueToNumber(right)));
         }
-        if (binExpr->operator_ == "==") {
+        if (op == "==") {
+            // Szybka ścieżka dla number == number
+            if (left->type == ValueData::NUMBER && right->type == ValueData::NUMBER) {
+                return makeNumber((left->number == right->number) ? 1.0 : 0.0);
+            }
             return makeNumber((valueToString(left) == valueToString(right)) ? 1.0 : 0.0);
         }
-        if (binExpr->operator_ == "!=") {
+        if (op == "!=") {
+            // Szybka ścieżka dla number != number
+            if (left->type == ValueData::NUMBER && right->type == ValueData::NUMBER) {
+                return makeNumber((left->number != right->number) ? 1.0 : 0.0);
+            }
             return makeNumber((valueToString(left) != valueToString(right)) ? 1.0 : 0.0);
         }
-        if (binExpr->operator_ == "<") {
+        if (op == "<") {
+            // Szybka ścieżka dla number < number
+            if (left->type == ValueData::NUMBER && right->type == ValueData::NUMBER) {
+                return makeNumber((left->number < right->number) ? 1.0 : 0.0);
+            }
             return makeNumber((valueToNumber(left) < valueToNumber(right)) ? 1.0 : 0.0);
         }
-        if (binExpr->operator_ == ">") {
+        if (op == ">") {
+            // Szybka ścieżka dla number > number
+            if (left->type == ValueData::NUMBER && right->type == ValueData::NUMBER) {
+                return makeNumber((left->number > right->number) ? 1.0 : 0.0);
+            }
             return makeNumber((valueToNumber(left) > valueToNumber(right)) ? 1.0 : 0.0);
         }
-        if (binExpr->operator_ == "<=") {
+        if (op == "<=") {
+            // Szybka ścieżka dla number <= number
+            if (left->type == ValueData::NUMBER && right->type == ValueData::NUMBER) {
+                return makeNumber((left->number <= right->number) ? 1.0 : 0.0);
+            }
             return makeNumber((valueToNumber(left) <= valueToNumber(right)) ? 1.0 : 0.0);
         }
-        if (binExpr->operator_ == ">=") {
+        if (op == ">=") {
+            // Szybka ścieżka dla number >= number
+            if (left->type == ValueData::NUMBER && right->type == ValueData::NUMBER) {
+                return makeNumber((left->number >= right->number) ? 1.0 : 0.0);
+            }
             return makeNumber((valueToNumber(left) >= valueToNumber(right)) ? 1.0 : 0.0);
         }
     }
     
     if (auto callExpr = dynamic_cast<CallExpression*>(expr)) {
         std::vector<Value> args;
+        args.reserve(callExpr->arguments.size()); // Pre-allocate for performance
         for (const auto& arg : callExpr->arguments) {
             args.push_back(evaluate(arg.get()));
         }
@@ -193,6 +502,7 @@ Value Interpreter::evaluate(Expression* expr) {
     if (auto methodCallExpr = dynamic_cast<MethodCallExpression*>(expr)) {
         Value object = evaluate(methodCallExpr->object.get());
         std::vector<Value> args;
+        args.reserve(methodCallExpr->arguments.size()); // Pre-allocate for performance
         for (const auto& arg : methodCallExpr->arguments) {
             args.push_back(evaluate(arg.get()));
         }
@@ -202,6 +512,7 @@ Value Interpreter::evaluate(Expression* expr) {
     throw std::runtime_error("Unknown expression type");
 }
 
+// Optimize while loop execution
 void Interpreter::execute(Statement* stmt) {
     if (returnFlag) return;
     
@@ -233,6 +544,122 @@ void Interpreter::execute(Statement* stmt) {
     }
     
     if (auto whileStmt = dynamic_cast<WhileStatement*>(stmt)) {
+        // Optymalizacja dla typowych pętli numerycznych
+        auto* condExpr = dynamic_cast<BinaryExpression*>(whileStmt->condition.get());
+        
+        // Sprawdź czy to prosta pętla numeryczna typu "while (i < 1000)"
+        if (condExpr && (condExpr->operator_ == "<" || condExpr->operator_ == "<=" || 
+                         condExpr->operator_ == ">" || condExpr->operator_ == ">=")) {
+            
+            auto* leftId = dynamic_cast<IdentifierExpression*>(condExpr->left.get());
+            auto* rightNum = dynamic_cast<NumberExpression*>(condExpr->right.get());
+            
+            // Szybka ścieżka dla pętli z jedną zmienną i stałą granicą
+            if (leftId && rightNum) {
+                std::string varName = leftId->name;
+                double limit = rightNum->value;
+                
+                // Pobierz początkową wartość
+                Value varValue;
+                try {
+                    varValue = getVariable(varName);
+                } catch (const std::exception&) {
+                    // Zmienna nie istnieje, użyj standardowej ścieżki
+                    goto regular_while_execution;
+                }
+                
+                // Optymalizuj tylko jeśli zmienna jest liczbą
+                if (varValue->type == ValueData::NUMBER) {
+                    double value = varValue->number;
+                    
+                    // Sprawdź czy ciało pętli zawiera tylko proste inkrementacje
+                    bool hasSimpleIncrement = false;
+                    double incrementValue = 1.0;
+                    
+                    if (whileStmt->body.size() == 1 || whileStmt->body.size() == 2) {
+                        // Sprawdź czy ostatnia instrukcja to i = i + 1 lub podobna
+                        auto* lastStmt = dynamic_cast<AssignmentStatement*>(whileStmt->body.back().get());
+                        if (lastStmt && lastStmt->variable == varName) {
+                            auto* binExpr = dynamic_cast<BinaryExpression*>(lastStmt->value.get());
+                            if (binExpr && binExpr->operator_ == "+") {
+                                auto* leftIdExpr = dynamic_cast<IdentifierExpression*>(binExpr->left.get());
+                                auto* rightNumExpr = dynamic_cast<NumberExpression*>(binExpr->right.get());
+                                
+                                if (leftIdExpr && leftIdExpr->name == varName && rightNumExpr) {
+                                    hasSimpleIncrement = true;
+                                    incrementValue = rightNumExpr->value;
+                                }
+                            }
+                        }
+                    }
+                    
+                    // Ultra-szybka ścieżka dla prostych pętli z inkrementacją
+                    if (hasSimpleIncrement) {
+                        // Wykonaj ciało pętli bez inkrementacji dla każdej iteracji
+                        int maxIterations = 1000000; // Zabezpieczenie przed nieskończoną pętlą
+                        int iterations = 0;
+                        
+                        while (((condExpr->operator_ == "<" && value < limit) ||
+                               (condExpr->operator_ == "<=" && value <= limit) ||
+                               (condExpr->operator_ == ">" && value > limit) ||
+                               (condExpr->operator_ == ">=" && value >= limit)) && 
+                               !returnFlag && iterations < maxIterations) {
+                            
+                            // Ustaw zmienną na aktualną wartość
+                            setVariable(varName, makeNumber(value));
+                            
+                            // Wykonaj wszystkie instrukcje oprócz ostatniej (inkrementacji)
+                            for (size_t i = 0; i < whileStmt->body.size() - 1; ++i) {
+                                execute(whileStmt->body[i].get());
+                                if (returnFlag) break;
+                            }
+                            
+                            // Ręcznie wykonaj inkrementację
+                            value += incrementValue;
+                            iterations++;
+                        }
+                        
+                        // Ustaw końcową wartość zmiennej
+                        setVariable(varName, makeNumber(value));
+                        return;
+                    }
+                    
+                    // Standardowa optymalizacja dla innych pętli numerycznych
+                    int maxIterations = 1000000; // Zabezpieczenie przed nieskończoną pętlą
+                    int iterations = 0;
+                    
+                    while (((condExpr->operator_ == "<" && value < limit) ||
+                           (condExpr->operator_ == "<=" && value <= limit) ||
+                           (condExpr->operator_ == ">" && value > limit) ||
+                           (condExpr->operator_ == ">=" && value >= limit)) && 
+                           !returnFlag && iterations < maxIterations) {
+                        
+                        // Ustaw zmienną na aktualną wartość
+                        setVariable(varName, makeNumber(value));
+                        executeBlock(whileStmt->body);
+                        
+                        // Pobierz zaktualizowaną wartość po wykonaniu ciała
+                        try {
+                            varValue = getVariable(varName);
+                            if (varValue->type != ValueData::NUMBER) {
+                                // Typ zmiennej się zmienił, wyjdź z optymalizowanej pętli
+                                break;
+                            }
+                            value = varValue->number;
+                        } catch (const std::exception&) {
+                            // Zmienna została usunięta, wyjdź z optymalizowanej pętli
+                            break;
+                        }
+                        
+                        iterations++;
+                    }
+                    return;
+                }
+            }
+        }
+        
+    regular_while_execution:
+        // Standardowe wykonanie pętli while (fallback)
         while (valueToBoolean(evaluate(whileStmt->condition.get())) && !returnFlag) {
             executeBlock(whileStmt->body);
         }
@@ -259,7 +686,7 @@ void Interpreter::execute(Statement* stmt) {
         std::string cmdStr = valueToString(command);
         int result = std::system(cmdStr.c_str());
         if (result != 0) {
-            std::cout << "command exited with code: " << result << std::endl;
+            std::cout << "Command exited with code: " << result << std::endl;
         }
         return;
     }
@@ -270,7 +697,7 @@ void Interpreter::execute(Statement* stmt) {
     }
     
     if (auto saveStmt = dynamic_cast<SaveStatement*>(stmt)) {
-        // just mark that this save slot exists
+        // Just mark that this save slot exists
         savedValues[saveStmt->saveName] = makeString("");
         return;
     }
@@ -321,50 +748,128 @@ Value Interpreter::callMethod(const Value& object, const std::string& methodName
     throw std::runtime_error("Cannot call method on non-object");
 }
 
+// Improve library organization
+void Interpreter::importLibrary(const std::string& libraryName) {
+    // Add the library to the imported set
+    importedLibraries.insert(libraryName);
+    
+    // Initialize standard libraries with their categories
+    static const std::unordered_map<std::string, std::string> libraryCategories = {
+        {"math", "Mathematics"},
+        {"colors", "Text Formatting"},
+        {"sc", "System and Console"},
+        {"fs", "File System"},
+        {"net", "Networking"},
+        {"time", "Date and Time"},
+        {"json", "Data Formats"},
+        {"crypto", "Cryptography"}
+    };
+    
+    // Print library information when imported
+    auto it = libraryCategories.find(libraryName);
+    if (it != libraryCategories.end()) {
+        std::cout << "Imported " << libraryName << " library (" << it->second << " category)" << std::endl;
+    }
+}
+
+// Optimize callFunction to handle library functions more efficiently
 Value Interpreter::callFunction(const std::string& name, const std::vector<Value>& args) {
-    // check library functions first
-    if (importedLibraries.count("math") && 
-        (name == "sqrt" || name == "pow" || name == "sin" || name == "cos" || 
-         name == "tan" || name == "abs" || name == "floor" || name == "ceil" || name == "random" ||
-         name == "log" || name == "log10" || name == "exp" || name == "min" || name == "max" || name == "round")) {
-        return callMathFunction(name, args);
-    }
+    // Cache dla często wywoływanych funkcji systemowych
+    static std::unordered_set<std::string> systemFunctions = {
+        "print", "ifu", "ec"
+    };
     
-    if (importedLibraries.count("sc") && (name == "ifu" || name == "print")) {
-        return callScFunction(name, args);
-    }
+    static std::unordered_set<std::string> mathFunctions = {
+        "sqrt", "pow", "sin", "cos", "tan", "abs", "floor", "ceil", "round",
+        "min", "max", "random", "log", "log10", "exp"
+    };
     
-    if (importedLibraries.count("colors") && name == "print") {
-        return callColorFunction(name, args);
-    }
+    static std::unordered_set<std::string> colorFunctions = {
+        "print", "colorize", "list_colors", "supports_color"
+    };
     
-    // built-in functions (always available)
-    if (name == "print") {
-        for (size_t i = 0; i < args.size(); ++i) {
-            if (i > 0) std::cout << " ";
-            std::cout << valueToString(args[i]);
+    static std::unordered_set<std::string> timeFunctions = {
+        "now", "timestamp", "format", "diff", "sleep", "date_parts", "add", "subtract",
+        "is_leap_year", "days_in_month"
+    };
+    
+    // Szybka ścieżka dla funkcji systemowych
+    if (systemFunctions.count(name) > 0) {
+        try {
+            return SystemLibrary::callFunction(name, args);
+        } catch (const std::runtime_error&) {
+            // Funkcja nie znaleziona, kontynuuj
         }
-        std::cout << std::endl;
-        return makeNumber(0.0);
     }
     
-    if (name == "ifu") {
-        if (!args.empty()) {
-            std::cout << valueToString(args[0]);
+    // Szybka ścieżka dla funkcji matematycznych
+    if (importedLibraries.count("math") && mathFunctions.count(name) > 0) {
+        try {
+            return MathLibrary::callFunction(name, args);
+        } catch (const std::runtime_error&) {
+            // Funkcja nie znaleziona, kontynuuj
         }
-        std::string line;
-        std::getline(std::cin, line);
-        return makeString(line);
     }
     
-    if (name == "ec") {
-        if (args.empty()) return makeNumber(0.0);
-        std::string cmdStr = valueToString(args[0]);
-        int result = std::system(cmdStr.c_str());
-        return makeNumber(static_cast<double>(result));
+    // Szybka ścieżka dla funkcji kolorów
+    if (importedLibraries.count("colors") && colorFunctions.count(name) > 0) {
+        try {
+            return ColorLibrary::callFunction(name, args);
+        } catch (const std::runtime_error&) {
+            // Funkcja nie znaleziona, kontynuuj
+        }
     }
     
-    // user-defined functions
+    // Szybka ścieżka dla funkcji czasu
+    if (importedLibraries.count("time") && timeFunctions.count(name) > 0) {
+        try {
+            return TimeLibrary::callFunction(name, args);
+        } catch (const std::runtime_error&) {
+            // Funkcja nie znaleziona, kontynuuj
+        }
+    }
+    
+    // Standardowa ścieżka dla bibliotek
+    if (importedLibraries.count("math")) {
+        try {
+            return MathLibrary::callFunction(name, args);
+        } catch (const std::runtime_error&) {
+            // Funkcja nie znaleziona, kontynuuj
+        }
+    }
+    
+    if (importedLibraries.count("colors")) {
+        try {
+            return ColorLibrary::callFunction(name, args);
+        } catch (const std::runtime_error&) {
+            // Funkcja nie znaleziona, kontynuuj
+        }
+    }
+    
+    if (importedLibraries.count("time")) {
+        try {
+            return TimeLibrary::callFunction(name, args);
+        } catch (const std::runtime_error&) {
+            // Funkcja nie znaleziona, kontynuuj
+        }
+    }
+    
+    if (importedLibraries.count("sc")) {
+        try {
+            return SystemLibrary::callFunction(name, args);
+        } catch (const std::runtime_error&) {
+            // Funkcja nie znaleziona, kontynuuj
+        }
+    }
+    
+    // Wbudowane funkcje (zawsze dostępne)
+    try {
+        return SystemLibrary::callFunction(name, args);
+    } catch (const std::runtime_error&) {
+        // Funkcja nie znaleziona, kontynuuj
+    }
+    
+    // Funkcje zdefiniowane przez użytkownika
     auto it = functions.find(name);
     if (it == functions.end()) {
         throw std::runtime_error("Undefined function: " + name);
@@ -378,12 +883,12 @@ Value Interpreter::callFunction(const std::string& name, const std::vector<Value
                                 std::to_string(args.size()));
     }
     
-    // save current state
+    // Zapisz aktualny stan
     auto savedVars = variables;
     bool savedReturnFlag = returnFlag;
     Value savedReturnValue = returnValue;
     
-    // set parameters
+    // Ustaw parametry
     for (size_t i = 0; i < func.parameters.size(); ++i) {
         setVariable(func.parameters[i], args[i]);
     }
@@ -391,216 +896,19 @@ Value Interpreter::callFunction(const std::string& name, const std::vector<Value
     returnFlag = false;
     returnValue = makeNumber(0.0);
     
-    // execute function body
+    // Wykonaj ciało funkcji
     if (func.body) {
         executeBlock(*func.body);
     }
     
     Value result = returnValue;
     
-    // restore state
+    // Przywróć stan
     variables = savedVars;
     returnFlag = savedReturnFlag;
     returnValue = savedReturnValue;
     
     return result;
-}
-
-void Interpreter::importLibrary(const std::string& libraryName) {
-    importedLibraries.insert(libraryName);
-    // std::cout << "imported library: " << libraryName << std::endl;
-}
-
-Value Interpreter::callMathFunction(const std::string& name, const std::vector<Value>& args) {
-    if (name == "sqrt") {
-        if (args.size() != 1) throw std::runtime_error("sqrt expects 1 argument");
-        return makeNumber(std::sqrt(valueToNumber(args[0])));
-    }
-    if (name == "pow") {
-        if (args.size() != 2) throw std::runtime_error("pow expects 2 arguments");
-        return makeNumber(std::pow(valueToNumber(args[0]), valueToNumber(args[1])));
-    }
-    if (name == "sin") {
-        if (args.size() != 1) throw std::runtime_error("sin expects 1 argument");
-        return makeNumber(std::sin(valueToNumber(args[0])));
-    }
-    if (name == "cos") {
-        if (args.size() != 1) throw std::runtime_error("cos expects 1 argument");
-        return makeNumber(std::cos(valueToNumber(args[0])));
-    }
-    if (name == "tan") {
-        if (args.size() != 1) throw std::runtime_error("tan expects 1 argument");
-        return makeNumber(std::tan(valueToNumber(args[0])));
-    }
-    if (name == "abs") {
-        if (args.size() != 1) throw std::runtime_error("abs expects 1 argument");
-        return makeNumber(std::abs(valueToNumber(args[0])));
-    }
-    if (name == "floor") {
-        if (args.size() != 1) throw std::runtime_error("floor expects 1 argument");
-        return makeNumber(std::floor(valueToNumber(args[0])));
-    }
-    if (name == "ceil") {
-        if (args.size() != 1) throw std::runtime_error("ceil expects 1 argument");
-        return makeNumber(std::ceil(valueToNumber(args[0])));
-    }
-    if (name == "random") {
-        static std::random_device rd;
-        static std::mt19937 gen(rd());
-        static std::uniform_real_distribution<> dis(0.0, 1.0);
-        return makeNumber(dis(gen));
-    }
-    if (name == "log") {
-        if (args.size() != 1) throw std::runtime_error("log expects 1 argument");
-        return makeNumber(std::log(valueToNumber(args[0])));
-    }
-    if (name == "log10") {
-        if (args.size() != 1) throw std::runtime_error("log10 expects 1 argument");
-        return makeNumber(std::log10(valueToNumber(args[0])));
-    }
-    if (name == "exp") {
-        if (args.size() != 1) throw std::runtime_error("exp expects 1 argument");
-        return makeNumber(std::exp(valueToNumber(args[0])));
-    }
-    if (name == "min") {
-        if (args.size() != 2) throw std::runtime_error("min expects 2 arguments");
-        return makeNumber(std::min(valueToNumber(args[0]), valueToNumber(args[1])));
-    }
-    if (name == "max") {
-        if (args.size() != 2) throw std::runtime_error("max expects 2 arguments");
-        return makeNumber(std::max(valueToNumber(args[0]), valueToNumber(args[1])));
-    }
-    if (name == "round") {
-        if (args.size() != 1) throw std::runtime_error("round expects 1 argument");
-        return makeNumber(std::round(valueToNumber(args[0])));
-    }
-    
-    throw std::runtime_error("Unknown math function: " + name);
-}
-
-Value Interpreter::callScFunction(const std::string& name, const std::vector<Value>& args) {
-    if (name == "print") {
-        for (size_t i = 0; i < args.size(); ++i) {
-            if (i > 0) std::cout << " ";
-            std::cout << valueToString(args[i]);
-        }
-        std::cout << std::endl;
-        return makeNumber(0.0);
-    }
-    
-    if (name == "ifu") {
-        if (!args.empty()) {
-            std::cout << valueToString(args[0]);
-        }
-        std::string line;
-        std::getline(std::cin, line);
-        return makeString(line);
-    }
-    
-    throw std::runtime_error("Unknown sc function: " + name);
-}
-
-Value Interpreter::callColorFunction(const std::string& name, const std::vector<Value>& args) {
-    if (name == "print") {
-        for (size_t i = 0; i < args.size(); ++i) {
-            if (i > 0) std::cout << " ";
-            std::string text = valueToString(args[i]);
-            
-            // check for color syntax c@color"text"
-            if (text.find("c@") == 0) {
-                size_t colorEnd = text.find('"');
-                if (colorEnd != std::string::npos) {
-                    std::string color = text.substr(2, colorEnd - 2);
-                    std::string content = text.substr(colorEnd + 1);
-                    if (content.back() == '"') content.pop_back();
-                    
-                    // ANSI color codes
-                    if (color == "red") std::cout << "\033[31m";
-                    else if (color == "green") std::cout << "\033[32m";
-                    else if (color == "yellow") std::cout << "\033[33m";
-                    else if (color == "blue") std::cout << "\033[34m";
-                    else if (color == "magenta") std::cout << "\033[35m";
-                    else if (color == "cyan") std::cout << "\033[36m";
-                    else if (color == "white") std::cout << "\033[37m";
-                    else if (color == "black") std::cout << "\033[30m";
-                    
-                    std::cout << content << "\033[0m"; // reset color
-                } else {
-                    std::cout << text;
-                }
-            } else {
-                std::cout << text;
-            }
-        }
-        std::cout << std::endl;
-        return makeNumber(0.0);
-    }
-    
-    throw std::runtime_error("Unknown color function: " + name);
-}
-
-std::string Interpreter::valueToString(const Value& value) {
-    switch (value->type) {
-        case ValueData::STRING:
-            return *value->string;
-        case ValueData::NUMBER: {
-            double num = value->number;
-            if (num == static_cast<int>(num)) {
-                return std::to_string(static_cast<int>(num));
-            }
-            return std::to_string(num);
-        }
-        case ValueData::ARRAY: {
-            std::string result = "[";
-            for (size_t i = 0; i < value->array->size(); ++i) {
-                if (i > 0) result += ", ";
-                result += valueToString((*value->array)[i]);
-            }
-            result += "]";
-            return result;
-        }
-        case ValueData::OBJECT: {
-            std::string result = "{";
-            bool first = true;
-            for (const auto& prop : *value->object) {
-                if (!first) result += ", ";
-                result += prop.first + ": " + valueToString(prop.second);
-                first = false;
-            }
-            result += "}";
-            return result;
-        }
-    }
-    return "unknown";
-}
-
-double Interpreter::valueToNumber(const Value& value) {
-    switch (value->type) {
-        case ValueData::NUMBER:
-            return value->number;
-        case ValueData::STRING:
-            try {
-                return std::stod(*value->string);
-            } catch (...) {
-                return 0.0;
-            }
-        default:
-            return 0.0;
-    }
-}
-
-bool Interpreter::valueToBoolean(const Value& value) {
-    switch (value->type) {
-        case ValueData::NUMBER:
-            return value->number != 0.0;
-        case ValueData::STRING:
-            return !value->string->empty();
-        case ValueData::ARRAY:
-            return !value->array->empty();
-        case ValueData::OBJECT:
-            return !value->object->empty();
-    }
-    return false;
 }
 
 std::string Interpreter::getValueType(const Value& value) {
@@ -618,8 +926,9 @@ std::string Interpreter::getValueType(const Value& value) {
             return "array";
         case ValueData::OBJECT:
             return "object";
+        default:
+            return "unknown";
     }
-    return "unknown";
 }
 
 void Interpreter::setVariable(const std::string& name, const Value& value) {
