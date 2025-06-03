@@ -7,8 +7,10 @@ if not exist install mkdir install
 if not exist temp mkdir temp
 
 set LLVM_MINGW_DIR=tools\llvm-mingw-20250528-ucrt-x86_64
-set COMMON_FLAGS=-std=c++17 -Wall -Wextra -O2 -Isrc
-set SRC_FILES=src\*.cpp
+set COMMON_FLAGS=-std=c++17 -Wall -Wextra -O3 -flto -ffast-math -Isrc
+set X86_FLAGS=-march=native
+set ARM_FLAGS=-mcpu=cortex-a72
+set SRC_FILES=src\*.cpp src\libraries\math\*.cpp src\libraries\colors\*.cpp src\libraries\time\*.cpp src\libraries\system\*.cpp
 
 if not exist %LLVM_MINGW_DIR% (
     echo [*] LLVM-Mingw x86_64 not found, downloading...
@@ -44,17 +46,21 @@ if exist rx.ico (
 
 echo [*] Building native binary...
 if exist temp\icon_x86_64.o (
-    g++ %COMMON_FLAGS% %SRC_FILES% temp\icon_x86_64.o -static -static-libgcc -static-libstdc++ -o install\rx.exe
+    g++ %COMMON_FLAGS% %X86_FLAGS% %SRC_FILES% temp\icon_x86_64.o -static -static-libgcc -static-libstdc++ -o install\rx.exe
 ) else (
-    g++ %COMMON_FLAGS% %SRC_FILES% -static -static-libgcc -static-libstdc++ -o install\rx.exe
+    g++ %COMMON_FLAGS% %X86_FLAGS% %SRC_FILES% -static -static-libgcc -static-libstdc++ -o install\rx.exe
 )
-echo [✓] Built: install\rx.exe
+if %ERRORLEVEL%==0 (
+    echo [✓] Built: install\rx.exe
+) else (
+    echo [X] Failed to build native binary
+)
 
 echo [*] Building x86_64...
 if exist temp\icon_x86_64.o (
-    x86_64-w64-mingw32-g++ %COMMON_FLAGS% %SRC_FILES% temp\icon_x86_64.o -static -static-libgcc -static-libstdc++ -o install\rx_x86_64.exe
+    x86_64-w64-mingw32-g++ %COMMON_FLAGS% %X86_FLAGS% %SRC_FILES% temp\icon_x86_64.o -static -static-libgcc -static-libstdc++ -o install\rx_x86_64.exe
 ) else (
-    x86_64-w64-mingw32-g++ %COMMON_FLAGS% %SRC_FILES% -static -static-libgcc -static-libstdc++ -o install\rx_x86_64.exe
+    x86_64-w64-mingw32-g++ %COMMON_FLAGS% %X86_FLAGS% %SRC_FILES% -static -static-libgcc -static-libstdc++ -o install\rx_x86_64.exe
 )
 if %ERRORLEVEL%==0 (
     echo [✓] Built: install\rx_x86_64.exe
@@ -64,9 +70,9 @@ if %ERRORLEVEL%==0 (
 
 echo [*] Building x86...
 if exist temp\icon_x86.o (
-    i686-w64-mingw32-g++ %COMMON_FLAGS% %SRC_FILES% temp\icon_x86.o -static -static-libgcc -static-libstdc++ -o install\rx_x86.exe
+    i686-w64-mingw32-g++ %COMMON_FLAGS% %X86_FLAGS% %SRC_FILES% temp\icon_x86.o -static -static-libgcc -static-libstdc++ -o install\rx_x86.exe
 ) else (
-    i686-w64-mingw32-g++ %COMMON_FLAGS% %SRC_FILES% -static -static-libgcc -static-libstdc++ -o install\rx_x86.exe
+    i686-w64-mingw32-g++ %COMMON_FLAGS% %X86_FLAGS% %SRC_FILES% -static -static-libgcc -static-libstdc++ -o install\rx_x86.exe
 )
 if %ERRORLEVEL%==0 (
     echo [✓] Built: install\rx_x86.exe
@@ -75,20 +81,20 @@ if %ERRORLEVEL%==0 (
 )
 
 echo [*] Building ARM64...
-if exist temp\icon_arm64.o (
-    aarch64-w64-mingw32-g++ %COMMON_FLAGS% %SRC_FILES% temp\icon_arm64.o -static -static-libgcc -static-libstdc++ -o install\rx_arm64.exe
-) else (
-    aarch64-w64-mingw32-g++ %COMMON_FLAGS% %SRC_FILES% -static -static-libgcc -static-libstdc++ -o install\rx_arm64.exe
-)
+aarch64-w64-mingw32-g++ %COMMON_FLAGS% %ARM_FLAGS% %SRC_FILES% -static -static-libgcc -static-libstdc++ -o install\rx_arm64.exe
 if %ERRORLEVEL%==0 (
     echo [✓] Built: install\rx_arm64.exe
     if exist rx.ico (
         echo [*] Adding icon to ARM64 executable...
-        tools\rcedit.exe install\rx_arm64.exe --set-icon rx.ico
-        if %ERRORLEVEL%==0 (
-            echo [✓] Icon added to ARM64 executable
+        if exist tools\rcedit.exe (
+            tools\rcedit.exe install\rx_arm64.exe --set-icon rx.ico
+            if %ERRORLEVEL%==0 (
+                echo [✓] Icon added to ARM64 executable
+            ) else (
+                echo [X] Failed to add icon to ARM64 executable
+            )
         ) else (
-            echo [X] Failed to add icon to ARM64 executable
+            echo [-] rcedit.exe not found, skipping icon for ARM64
         )
     )
 ) else (
@@ -97,9 +103,13 @@ if %ERRORLEVEL%==0 (
 
 echo [*] Testing native build...
 echo print("Hello from RX!") > test.rx
-install\rx.exe test.rx
-del test.rx
+if exist install\rx.exe (
+    install\rx.exe test.rx
+) else (
+    echo [X] Native binary not found, skipping test
+)
+del test.rx >nul 2>nul
 
 rmdir /s /q temp >nul 2>nul
 
-echo [✓] All builds completed successfully!
+echo [✓] Build process completed!

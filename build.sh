@@ -10,7 +10,8 @@ echo "4) macOS ARM (aarch64, clang)"
 echo "5) Build for all platforms"
 read -rp "Enter number (1-5): " choice
 
-COMMON_FLAGS="-std=c++17 -Wall -Wextra -O2 -I./src"
+COMMON_FLAGS="-std=c++17 -Wall -Wextra -O3 -march=native -flto -ffast-math -I./src"
+SRC_FILES="src/*.cpp src/libraries/math/*.cpp src/libraries/colors/*.cpp src/libraries/time/*.cpp src/libraries/system/*.cpp"
 
 install_if_missing() {
     cmd=$1
@@ -29,14 +30,14 @@ install_if_missing() {
 build_linux_x86_64() {
     install_if_missing g++ g++
     echo "Building Linux x86_64..."
-    g++ $COMMON_FLAGS src/*.cpp -o install/rx_linux_x86_64
+    g++ $COMMON_FLAGS $SRC_FILES -o install/rx_linux_x86_64
     echo "Built: install/rx_linux_x86_64"
 }
 
 build_linux_arm() {
     install_if_missing aarch64-linux-gnu-g++ g++-aarch64-linux-gnu
     echo "Building Linux ARM (aarch64)..."
-    aarch64-linux-gnu-g++ $COMMON_FLAGS src/*.cpp -o install/rx_linux_arm64
+    aarch64-linux-gnu-g++ $COMMON_FLAGS $SRC_FILES -o install/rx_linux_arm64
     echo "Built: install/rx_linux_arm64"
 }
 
@@ -47,7 +48,7 @@ build_macos_x86_64() {
     fi
     install_if_missing clang++ clang
     echo "Building macOS x86_64..."
-    clang++ $COMMON_FLAGS src/*.cpp -o install/rx_macos_x86_64
+    clang++ $COMMON_FLAGS $SRC_FILES -o install/rx_macos_x86_64
     echo "Built: install/rx_macos_x86_64"
 }
 
@@ -58,7 +59,7 @@ build_macos_arm() {
     fi
     install_if_missing clang++ clang
     echo "Building macOS ARM (aarch64)..."
-    clang++ $COMMON_FLAGS -target arm64-apple-macos11 -stdlib=libc++ -isysroot $(xcrun --sdk macosx --show-sdk-path) src/*.cpp -o install/rx_macos_arm64
+    clang++ $COMMON_FLAGS -target arm64-apple-macos11 -stdlib=libc++ -isysroot $(xcrun --sdk macosx --show-sdk-path) $SRC_FILES -o install/rx_macos_arm64
     echo "Built: install/rx_macos_arm64"
 }
 
@@ -75,14 +76,15 @@ run_test() {
     fi
 
     if [ -f "$TARGET" ]; then
+        echo 'print("Hello from RX!")' > temp/test.rx
         "$TARGET" temp/test.rx || echo "Test failed :("
+        rm -f temp/test.rx
     else
         echo "File $TARGET does not exist, skipping test."
     fi
 }
 
 mkdir -p install temp
-echo 'print("Hello from RX!")' > temp/test.rx
 
 case $choice in
     1)

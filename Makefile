@@ -1,85 +1,73 @@
+# RX Language Makefile
+
 CXX = g++
-CXXFLAGS = -std=c++17 -Wall -Wextra -pedantic -O2 -I./src
+CXXFLAGS = -std=c++17 -Wall -Wextra -O3 -march=native -Isrc
+LDFLAGS = -static -static-libgcc -static-libstdc++
+
+# Source directories
 SRCDIR = src
-BUILDDIR = build
-installDIR = install
+LIBDIRS = src/libraries/math src/libraries/colors src/libraries/time src/libraries/system
 
-SOURCES = $(wildcard $(SRCDIR)/*.cpp)
-OBJECTS = $(SOURCES:$(SRCDIR)/%.cpp=$(BUILDDIR)/%.o)
-TARGET = $(installDIR)/rx
+# Find all source files
+SOURCES = $(wildcard $(SRCDIR)/*.cpp) \
+          $(wildcard $(SRCDIR)/libraries/math/*.cpp) \
+          $(wildcard $(SRCDIR)/libraries/colors/*.cpp) \
+          $(wildcard $(SRCDIR)/libraries/time/*.cpp) \
+          $(wildcard $(SRCDIR)/libraries/system/*.cpp)
 
-UNAME_S := $(shell uname -s)
-ifeq ($(UNAME_S),Linux)
-    TARGET_SUFFIX = _linux
-endif
-ifeq ($(UNAME_S),Darwin)
-    TARGET_SUFFIX = _macos
-    CXX = clang++
-endif
-ifdef OS
-    TARGET_SUFFIX = .exe
-    CXX = x86_64-w64-mingw32-g++
-endif
+# Object files
+OBJECTS = $(SOURCES:.cpp=.o)
 
-all: $(TARGET)$(TARGET_SUFFIX)
+# Target executable
+TARGET = install/rx
 
-$(BUILDDIR):
-	mkdir -p $(BUILDDIR)
+# Default target
+all: $(TARGET)
 
-$(installDIR):
-	mkdir -p $(installDIR)
+# Create install directory
+install:
+	mkdir -p install
 
-$(BUILDDIR)/%.o: $(SRCDIR)/%.cpp | $(BUILDDIR)
+# Build target
+$(TARGET): install $(OBJECTS)
+	$(CXX) $(OBJECTS) $(LDFLAGS) -o $@
+	@echo "Built: $(TARGET)"
+
+# Compile source files
+%.o: %.cpp
 	$(CXX) $(CXXFLAGS) -c $< -o $@
 
-$(TARGET)$(TARGET_SUFFIX): $(OBJECTS) | $(installDIR)
-	$(CXX) $(OBJECTS) -o $@
-
-windows: 
-	$(MAKE) CXX=x86_64-w64-mingw32-g++ TARGET_SUFFIX=.exe
-
-linux: 
-	$(MAKE) CXX=g++ TARGET_SUFFIX=_linux
-
-macos: 
-	$(MAKE) CXX=clang++ TARGET_SUFFIX=_macos
-
-build_all: clean
-	@echo "Building for all platforms..."
-	-$(MAKE) linux
-	-$(MAKE) windows  
-	-$(MAKE) macos
-
+# Clean build files
 clean:
-	rm -rf $(BUILDDIR) $(installDIR)
+	rm -f $(OBJECTS) $(TARGET)
+	@echo "Cleaned build files"
 
-install: $(TARGET)$(TARGET_SUFFIX)
-	cp $(TARGET)$(TARGET_SUFFIX) /usr/local/install/rx
-	chmod +x /usr/local/install/rx
+# Test the build
+test: $(TARGET)
+	@echo 'print("Hello from RX!")' > test.rx
+	./$(TARGET) test.rx
+	@rm -f test.rx
 
-uninstall:
-	rm -f /usr/local/install/rx
+# Install system-wide (Linux/macOS)
+install-system: $(TARGET)
+	sudo cp $(TARGET) /usr/local/bin/rx
+	@echo "Installed RX to /usr/local/bin/rx"
 
-test: $(TARGET)$(TARGET_SUFFIX)
-	@echo 'print("Hello, RX World!")' > test.rx
-	@echo "Testing RX interpreter..."
-	./$(TARGET)$(TARGET_SUFFIX) test.rx
-	@rm test.rx
-	@echo "Test completed successfully!"
+# Uninstall system-wide
+uninstall-system:
+	sudo rm -f /usr/local/bin/rx
+	@echo "Uninstalled RX from /usr/local/bin"
 
-examples: $(TARGET)$(TARGET_SUFFIX)
-	@echo "Running example programs..."
-	@if [ -f "examples/hello.rx" ]; then \
-		echo "=== Running hello.rx ==="; \
-		./$(TARGET)$(TARGET_SUFFIX) examples/hello.rx; \
-	fi
-	@if [ -f "examples/calculator.rx" ]; then \
-		echo "=== Running calculator.rx ==="; \
-		./$(TARGET)$(TARGET_SUFFIX) examples/calculator.rx; \
-	fi
-	@if [ -f "examples/fibonacci.rx" ]; then \
-		echo "=== Running fibonacci.rx ==="; \
-		./$(TARGET)$(TARGET_SUFFIX) examples/fibonacci.rx; \
-	fi
+# Show help
+help:
+	@echo "RX Language Build System"
+	@echo ""
+	@echo "Available targets:"
+	@echo "  all              - Build the RX interpreter (default)"
+	@echo "  clean            - Remove build files"
+	@echo "  test             - Build and test the interpreter"
+	@echo "  install-system   - Install RX system-wide (requires sudo)"
+	@echo "  uninstall-system - Uninstall RX system-wide (requires sudo)"
+	@echo "  help             - Show this help message"
 
-.PHONY: all clean install uninstall test examples windows linux macos build_all
+.PHONY: all clean test install-system uninstall-system help install
