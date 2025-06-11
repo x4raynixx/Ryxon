@@ -28,7 +28,7 @@
 > 
 > Step 1: Run the command bellow in a shell!
 > 
-> ```curl -fsSL https://raw.githubusercontent.com/x4raynixx/Ryxon/master/install.sh | bash```
+> ```curl -fsSL https://raw.githubusercontent.com/x4raynixx/Ryxon/master/install/install.sh | bash```
 
 ---
 
