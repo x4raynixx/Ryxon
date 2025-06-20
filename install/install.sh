@@ -41,7 +41,6 @@ if [[ "$PREFIX" == *"com.termux"* ]]; then
 fi
 
 FILE_NAME="rx_${OS}_${ARCH}"
-URL="https://files-hosterino.vercel.app/${FILE_NAME}"
 TMPFILE=$(mktemp)
 
 if ! curl -fsSL "$URL" -o "$TMPFILE"; then
